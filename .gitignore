@@ -1,0 +1,12 @@
+node_modules/
+out/
+release/
+test-results/
+delete/
+*.sqlite*
+*.db
+*.db-shm
+*.db-wal
+.env*
+!.env.example
+*.log

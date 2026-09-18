@@ -1,0 +1,1 @@
+ALTER TABLE `papers` ADD `honors` text DEFAULT '[]' NOT NULL;

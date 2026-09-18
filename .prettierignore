@@ -1,0 +1,8 @@
+node_modules
+out
+release
+test-results
+delete
+package-lock.json
+src/main/database/migrations
+resources
