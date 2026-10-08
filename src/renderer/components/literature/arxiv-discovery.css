@@ -1,0 +1,26 @@
+.arxiv-preparation {
+  padding: 20px 24px;
+  margin: 0 0 24px;
+  border-radius: 14px;
+  background: var(--surface-inset);
+}
+.arxiv-preparation-heading { display: flex; align-items: center; gap: 12px; }
+.arxiv-preparation-heading > svg { color: var(--accent); flex-shrink: 0; }
+.arxiv-preparation-heading strong { font-size: 1rem; font-weight: 650; }
+.arxiv-preparation-heading p { margin: 5px 0 0; font-size: 0.857143rem; color: var(--text-secondary); }
+.arxiv-preparation .field-error { margin: 12px 0 0; }
+.arxiv-preparation-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.arxiv-candidate-source-title { margin: 7px 0 9px; font-size: 0.928571rem; line-height: 1.5; color: var(--text-secondary); }
+.arxiv-candidates .arxiv-candidate-list { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.arxiv-candidates .arxiv-candidate-heading h3 { font-size: 1.071429rem; }
+.arxiv-bilingual-abstract { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.arxiv-bilingual-abstract section { min-width: 0; }
+.arxiv-bilingual-abstract section > span { display: block; margin-bottom: 8px; font-size: 0.785714rem; font-weight: 650; color: var(--text-secondary); }
+.arxiv-candidates .arxiv-bilingual-abstract p { overflow-wrap: anywhere; font-size: 0.928571rem; }
+.arxiv-discovery-empty { display: grid; justify-items: center; padding: 56px 24px; text-align: center; color: var(--text-secondary); }
+.arxiv-discovery-empty h2 { margin: 16px 0 8px; font-size: 1.285714rem; color: var(--text-primary); }
+.arxiv-discovery-empty p { max-width: 46ch; line-height: 1.7; margin: 0 0 20px; }
+@media (max-width: 1050px) {
+  .arxiv-bilingual-abstract { grid-template-columns: 1fr; gap: 16px; }
+  .arxiv-preparation { padding: 18px; }
+}

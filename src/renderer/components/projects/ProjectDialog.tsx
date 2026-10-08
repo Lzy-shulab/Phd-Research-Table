@@ -1,7 +1,7 @@
 import { colorLabels } from '../../../shared/labels'
 import { useState } from 'react'
 import { Archive, ArchiveRestore, Check, Trash2 } from 'lucide-react'
-import { colorKeys, type ColorKey, type Project } from '../../../shared/types'
+import { colorKeys, type ColorKey, type Project, type ProjectTaskAction } from '../../../shared/types'
 import { useWorkbench } from '../../stores/workbench'
 import { Button } from '../ui/button'
 import { Dialog } from '../ui/dialog'
@@ -21,8 +21,10 @@ export function ProjectDialog({
   const [busy, setBusy] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [moveTo, setMoveTo] = useState('')
+  const [taskAction, setTaskAction] = useState<ProjectTaskAction>('delete')
   const projects = useWorkbench((s) => s.projects)
   const count = useWorkbench((s) => s.tasks.filter((t) => t.projectId === project?.id).length)
+  const completedCount = useWorkbench((s) => s.tasks.filter((t) => t.projectId === project?.id && t.status === 'completed').length)
   const createProject = useWorkbench((s) => s.createProject)
   const updateProject = useWorkbench((s) => s.updateProject)
   const deleteProject = useWorkbench((s) => s.deleteProject)
@@ -110,7 +112,8 @@ export function ProjectDialog({
               <Button
                 variant="ghost"
                 className="danger-text"
-                onClick={() => setConfirmDelete(true)}
+                disabled={busy}
+                onClick={() => { setTaskAction('delete'); setConfirmDelete(true) }}
               >
                 <Trash2 size={15} />
                 删除项目
@@ -132,21 +135,26 @@ export function ProjectDialog({
       </Dialog>
       <Dialog
         open={confirmDelete}
-        title="删除此项目？"
+        title={`删除“${project?.name ?? ''}”？`}
         description={
           count
-            ? `此项目有 ${count} 项计划。选择接收项目，所有计划将一起转移并保留日期、进度和备注。`
-            : '此项目没有计划，删除后无法恢复。'
+            ? `此项目有 ${count} 项任务：${count - completedCount} 项未完成、${completedCount} 项已完成。请确认任务的处理方式。`
+            : '此项目没有任务，删除后无法恢复。'
         }
         onOpenChange={(open) => {
           if (!open && !busy) setConfirmDelete(false)
         }}
       >
-        {count > 0 && (
+        {count > 0 && <fieldset className="project-delete-options"><legend>项目中的任务</legend>{([
+          ['delete', '连同任务删除', `删除项目及其 ${count} 项任务，无法恢复。`],
+          ['retain', '保留任务', '任务归为“未分配项目”，日期和完成状态保留。'],
+          ['transfer', '转移任务', '将任务移入另一个项目。']
+        ] as const).map(([value, label, hint]) => <label key={value} className={taskAction === value ? 'is-selected' : ''}><input type="radio" name="project-task-action" value={value} checked={taskAction === value} disabled={busy} onChange={() => setTaskAction(value)} /><span><strong>{label}</strong><small>{hint}</small></span></label>)}</fieldset>}
+        {count > 0 && taskAction === 'transfer' && (
           <label className="field">
-            将计划转移到
+            将任务转移到
             <select
-              aria-label="将计划转移到"
+              aria-label="将任务转移到"
               value={moveTo}
               onChange={(event) => setMoveTo(event.target.value)}
             >
@@ -163,7 +171,7 @@ export function ProjectDialog({
             </select>
           </label>
         )}
-        {count > 0 &&
+        {count > 0 && taskAction === 'transfer' &&
           projects.filter((p) => p.id !== project?.id && !p.archivedAt).length === 0 && (
             <p className="field-hint">
               暂时没有其他项目。可以取消并归档当前项目，或先创建接收项目。
@@ -175,16 +183,16 @@ export function ProjectDialog({
           </Button>
           <Button
             variant="danger"
-            disabled={busy || (count > 0 && !moveTo)}
+            disabled={busy || (count > 0 && taskAction === 'transfer' && !moveTo)}
             onClick={async () => {
               if (!project) return
               setBusy(true)
-              const ok = await deleteProject(project.id, moveTo || undefined)
+              const ok = await deleteProject(project.id, taskAction === 'transfer' ? moveTo : undefined, taskAction)
               setBusy(false)
               if (ok) onClose()
             }}
           >
-            {busy ? '正在处理…' : count ? '转移计划并删除' : '删除'}
+            {busy ? '正在处理…' : !count ? '删除项目' : taskAction === 'delete' ? `删除项目及 ${count} 项任务` : taskAction === 'retain' ? '保留任务并删除项目' : '转移任务并删除项目'}
           </Button>
         </div>
       </Dialog>

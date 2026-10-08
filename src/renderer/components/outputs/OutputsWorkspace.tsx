@@ -1,18 +1,42 @@
-import { useState } from 'react'
-import { Library, FileText, Plus, Search } from 'lucide-react'
-import { useLibrary } from '../../stores/library'
+import { useEffect, useState } from 'react'
+import { Download, FileText, Library, Plus, Search } from 'lucide-react'
+import { libraryAction, useLibrary } from '../../stores/library'
+import { useWorkbench } from '../../stores/workbench'
 import { Button } from '../ui/button'
 import { PdfReader } from '../literature/PdfReader'
 import { PublicationDialog } from './PublicationDialog'
 import { TranslationQueue } from '../literature/TranslationQueue'
+import { TranslationSettings } from '../literature/TranslationSettings'
 import { PublicationBookcase } from './PublicationBookcase'
 import { PublicationList } from './PublicationList'
+import type { Paper, PublicationInput } from '../../../shared/types'
 
 export function OutputsWorkspace() {
   const { papers, outputYear, outputJournal, filterOutputs, loaded, loadError } = useLibrary()
   const [editing, setEditing] = useState<string | 'new' | null>(null)
+  const [seed, setSeed] = useState<{ values: Partial<PublicationInput>; sourceSubmissionId: string } | null>(null)
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState('newest')
+  const [translationSettings, setTranslationSettings] = useState(false)
+  const translate = async (paper: Paper) => {
+    try {
+      const result = await window.workbench.translationHealth()
+      if (!result.ok) { useWorkbench.getState().notify(result.error.message); return }
+      if (!result.data.installed || !result.data.configured) {
+        setTranslationSettings(true)
+        useWorkbench.getState().notify(result.data.message, 'info')
+        return
+      }
+      await libraryAction(window.workbench.retryTranslation(paper.id), '已加入翻译队列。')
+    } catch { useWorkbench.getState().notify('暂时无法启动翻译，请重试。') }
+  }
+  useEffect(() => {
+    const openRecord = (event: Event) => setEditing((event as CustomEvent<string>).detail)
+    const createFromSubmission = (event: Event) => { setSeed((event as CustomEvent<{ values: Partial<PublicationInput>; sourceSubmissionId: string }>).detail); setEditing('new') }
+    window.addEventListener('workbench:open-publication-record', openRecord)
+    window.addEventListener('workbench:create-publication-from-submission', createFromSubmission)
+    return () => { window.removeEventListener('workbench:open-publication-record', openRecord); window.removeEventListener('workbench:create-publication-from-submission', createFromSubmission) }
+  }, [])
   const publications = papers.filter((p) => p.collection === 'publication')
   const filtered = publications
     .filter(
@@ -63,6 +87,8 @@ export function OutputsWorkspace() {
           <option value="newest">发表时间由近到远</option>
           <option value="title">标题排序</option>
         </select>
+        <Button variant="ghost" onClick={() => void window.workbench.exportPublications('bibtex')}><Download size={14} />BibTeX</Button>
+        <Button variant="ghost" onClick={() => void window.workbench.exportPublications('csv')}><Download size={14} />CSV</Button>
       </div>
       <TranslationQueue papers={publications} />
       <div className="library-scroll">
@@ -97,7 +123,7 @@ export function OutputsWorkspace() {
           <div className="empty-state">正在读取科研成果…</div>
         ) : filtered.length ? (
           <>
-            <PublicationBookcase papers={filtered} edit={setEditing} />
+            <PublicationBookcase papers={filtered} edit={setEditing} translate={(paper) => void translate(paper)} />
             <PublicationList papers={filtered} edit={setEditing} />
           </>
         ) : (
@@ -130,9 +156,10 @@ export function OutputsWorkspace() {
         )}
       </div>
       {editing && (
-        <PublicationDialog key={editing} paper={selected} onClose={() => setEditing(null)} />
+        <PublicationDialog key={`${editing}:${seed?.sourceSubmissionId ?? ''}`} paper={selected} seed={editing === 'new' ? seed?.values : undefined} sourceSubmissionId={editing === 'new' ? seed?.sourceSubmissionId : undefined} onClose={() => { setEditing(null); setSeed(null) }} />
       )}
       <PdfReader />
+      {translationSettings && <TranslationSettings onClose={() => setTranslationSettings(false)} />}
     </main>
   )
 }

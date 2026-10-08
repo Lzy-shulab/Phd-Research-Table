@@ -12,7 +12,7 @@ let app = await electron.launch({ args: ['.'], env })
 try {
   const page = await app.firstWindow()
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].hide())
-  await page.getByRole('heading', { name: 'Today Plan', exact: true }).waitFor()
+  await page.getByRole('heading', { name: '今日计划', exact: true }).waitFor()
   await ensureTestProject(page)
   await page
     .getByRole('textbox', { name: '添加一个研究任务', exact: true })

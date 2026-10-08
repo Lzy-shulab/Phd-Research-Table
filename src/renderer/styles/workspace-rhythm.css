@@ -1,0 +1,72 @@
+/* Shared workspace geometry and interaction timing. These roles keep every module aligned. */
+:root {
+  --workspace-inset: clamp(20px, 2vw, 32px);
+  --panel-inset: 24px;
+  --section-gap: 24px;
+  --control-gap: 8px;
+  --motion-control: 140ms;
+  --motion-panel: 220ms;
+  --motion-ease: cubic-bezier(.16, 1, .3, 1);
+}
+:root[data-density='compact'] { --panel-inset: 16px; --section-gap: 16px; }
+.workspace-header,
+.workspace-body,
+.library-toolbar,
+.library-scroll,
+.submissions-body,
+.settings-body { padding-inline: var(--workspace-inset); }
+.workspace-header { max-width: none; width: 100%; margin-inline: 0; padding-block: 24px; border-bottom: 0; }
+.workspace-header + :is(.workspace-body, .library-toolbar, .submissions-body, .settings-body) { padding-top: 8px; }
+.workspace-body, .library-toolbar, .settings-workspace .workspace-header, .settings-body { max-width: none; width: 100%; margin-inline: 0; }
+.plan-note-board { gap: var(--section-gap); align-items: start; }
+.plan-note, [data-theme='dark'] .plan-note, .report-panel { padding: var(--panel-inset); }
+.plan-note, [data-theme='dark'] .plan-note { min-height: 0; }
+.plan-note { --task-row-height: 4.7rem; }
+.plan-note-header { height: 42px; flex-shrink: 0; margin-bottom: 12px; }
+.plan-note-header h2 { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.plan-note-task-scroll { height: calc(var(--task-row-height) * 3 + 8px * 2); flex-shrink: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.plan-note-task-scroll:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
+.plan-note .task-list { gap: 8px; max-height: none; overflow: visible; padding: 0; }
+.plan-note .task-row { height: var(--task-row-height); min-height: var(--task-row-height); flex-shrink: 0; }
+.plan-note .task-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; line-height: 1.4; }
+.plan-note .task-meta { flex-wrap: nowrap; overflow: hidden; white-space: nowrap; }
+.plan-note-footer { margin-top: 16px; min-height: 22px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.plan-note-footer small { color: var(--text-secondary); font-size: .72rem; white-space: nowrap; }
+.report-panel > header { margin-bottom: var(--section-gap); }
+.report-goal { padding: 16px; }
+.report-goal:last-child { padding: 16px; }
+.project-delete-options { border: 0; padding: 0; margin: 20px 0; display: grid; gap: 8px; }
+.project-delete-options legend { padding-bottom: 10px; font-size: .86rem; font-weight: 600; }
+.project-delete-options > label { display: flex; align-items: flex-start; gap: 10px; padding: 12px; border-radius: 10px; cursor: pointer; background: var(--surface-inset); }
+.project-delete-options > label.is-selected { background: var(--accent-soft); }
+.project-delete-options input { margin-top: 3px; flex-shrink: 0; accent-color: var(--accent); }
+.project-delete-options span { display: grid; gap: 4px; }
+.project-delete-options strong { font-size: .9rem; font-weight: 600; }
+.project-delete-options small { font-size: .8rem; color: var(--text-secondary); line-height: 1.6; }
+.sidebar-link { gap: var(--control-gap); padding-inline: 10px; }
+.sidebar-link > span:not(.nav-selection) { white-space: nowrap; }
+.sidebar-link > svg, .sidebar-link .nav-count { flex-shrink: 0; }
+.button, .plan-layout-switch button, .sidebar-link, .task-checkbox {
+  transition: background-color var(--motion-control) var(--motion-ease), color var(--motion-control) var(--motion-ease), border-color var(--motion-control) var(--motion-ease), transform var(--motion-control) var(--motion-ease);
+}
+.dialog-overlay[data-state='open'] { animation: workspace-overlay-in var(--motion-panel) var(--motion-ease); }
+.dialog-overlay[data-state='closed'] { animation: workspace-overlay-out 140ms var(--motion-ease); }
+.dialog-content[data-state='open'] { animation: workspace-dialog-in var(--motion-panel) var(--motion-ease); }
+.dialog-content[data-state='closed'] { animation: workspace-dialog-out 140ms var(--motion-ease); }
+@keyframes workspace-overlay-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes workspace-overlay-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes workspace-dialog-in { from { opacity: 0; transform: translate(-50%, calc(-50% + 8px)) scale(.99); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
+@keyframes workspace-dialog-out { from { opacity: 1; } to { opacity: 0; transform: translate(-50%, calc(-50% + 4px)); } }
+@media (max-height: 780px) { .workspace-header { padding-block: 16px; } }
+@media (max-width: 1250px) {
+  :root { --panel-inset: 20px; }
+  .report-goals { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .report-goal { padding: 16px; gap: 10px; }
+  .report-ring { width: 52px; height: 52px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root { --motion-control: 80ms; --motion-panel: 100ms; }
+  .dialog-content[data-state='open'] { animation-name: workspace-overlay-in; }
+  .dialog-content[data-state='closed'] { animation-name: workspace-overlay-out; }
+  .countdown-toolbar svg { transition: none; }
+}

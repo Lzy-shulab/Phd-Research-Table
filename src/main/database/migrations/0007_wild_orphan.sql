@@ -1,0 +1,1 @@
+ALTER TABLE `papers` ADD `highlights` text DEFAULT '[]' NOT NULL;

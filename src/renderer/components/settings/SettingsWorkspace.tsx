@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Check, Database, FolderOpen, HardDrive, Library, Rss, ScrollText } from 'lucide-react'
+import { Check, Database, FolderOpen, HardDrive, Languages, Library, Rss, ScrollText } from 'lucide-react'
 import type { PaperCollection, Result, StorageSnapshot } from '../../../shared/types'
 import { Button } from '../ui/button'
 import { useWorkbench } from '../../stores/workbench'
@@ -7,27 +7,35 @@ import { libraryAction, useLibrary } from '../../stores/library'
 import { AppearanceSettings } from './AppearanceSettings'
 import { AssistantSettings } from './AssistantSettings'
 import { UpdateSettings } from './UpdateSettings'
+import { TranslationSettings } from '../literature/TranslationSettings'
 
 const locations = [
   { kind: 'library', label: '文献 PDF', description: '保存手动导入的文献及对应译文。', icon: Library },
   { kind: 'publication', label: '科研成果 PDF', description: '保存已发表论文的 PDF 及对应译文。', icon: ScrollText },
-  { kind: 'arxiv', label: 'Arxiv Daily', description: '自动下载的论文按日期整理，译文保存在原文旁。', icon: Rss }
+  { kind: 'arxiv', label: 'Arvix 文献', description: '收藏的论文在我的文件夹中阅读；PDF 按日期保存，译文位于原文旁。', icon: Rss }
 ] satisfies { kind: PaperCollection; label: string; description: string; icon: typeof Library }[]
 function unwrap<T>(result: Result<T>): T {
   if (!result.ok) throw new Error(result.error.message)
   return result.data
 }
 export function SettingsWorkspace() {
+  const settingsTarget = useWorkbench((state) => state.settingsTarget)
   const metadataOnline = useLibrary((state) => state.metadataOnline)
   const [snapshot, setSnapshot] = useState<StorageSnapshot | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [saved, setSaved] = useState('')
+  const [translationSettings, setTranslationSettings] = useState(false)
   const load = async () => {
     try { setSnapshot(unwrap(await window.workbench.storageSnapshot())); setError('') }
     catch (error) { setError(error instanceof Error ? error.message : '无法读取保存目录。') }
   }
   useEffect(() => { void load() }, [])
+  useEffect(() => {
+    if (settingsTarget !== 'assistant') return
+    document.getElementById('assistant-settings')?.scrollIntoView({ block: 'start' })
+    useWorkbench.getState().clearSettingsTarget()
+  }, [settingsTarget])
   const choose = async (kind: PaperCollection, label: string) => {
     setBusy(kind); setError(''); setSaved('')
     try {
@@ -65,6 +73,7 @@ export function SettingsWorkspace() {
     <div className="settings-body">
       <AppearanceSettings />
       <AssistantSettings />
+      <section className="storage-section translation-settings-entry"><div className="storage-section-heading"><Languages size={19} /><div><h2>全文翻译配置</h2><p>单独选择 PDF2zh 引擎、服务和模型；与计划助手配置互不覆盖。</p></div></div><Button onClick={() => setTranslationSettings(true)}>打开全文翻译设置</Button></section>
       <UpdateSettings />
       <section className="storage-section" id="storage-settings" aria-labelledby="storage-heading">
         <div className="storage-section-heading"><HardDrive size={19} /><div><h2 id="storage-heading">保存位置</h2><p>选择后自动保存，下次打开工作台继续使用。</p></div></div>
@@ -90,6 +99,7 @@ export function SettingsWorkspace() {
       </section>
       <section className="storage-metadata"><div><h2>文献信息自动读取</h2><p>导入后读取 PDF 标题、作者等资料，允许使用 DOI 或标题向 Crossref 查询公开书目；不会上传 PDF 全文。</p></div>
         <label><span>允许联网补全</span><input type="checkbox" role="switch" aria-label="允许联网补全文献信息" checked={metadataOnline} onChange={(event) => void libraryAction(window.workbench.setMetadataOnline(event.target.checked))} /></label></section>
+      {translationSettings && <TranslationSettings onClose={() => setTranslationSettings(false)} />}
     </div>
   </main>
 }

@@ -37,7 +37,7 @@ export function PdfCover({ paper }: { paper: Paper }) {
   const [url, setUrl] = useState(covers.get(paper.id) ?? '')
   const [error, setError] = useState('')
   useEffect(() => {
-    if (url) return
+    if (url || !paper.sourcePath) return
     let active = true
     const observer = new IntersectionObserver((entries) => {
       if (!entries.some((entry) => entry.isIntersecting)) return
@@ -57,6 +57,6 @@ export function PdfCover({ paper }: { paper: Paper }) {
   }, [paper, url])
   return <div className="pdf-cover" ref={host}>
     {url ? <img src={url} alt={`${paper.title} 的 PDF 首页`} draggable={false} />
-      : <div className="pdf-cover-placeholder"><FileText size={34} strokeWidth={1.1} /><span title={error}>{error ? '首页暂不可用' : 'PDF'}</span></div>}
+      : <div className="pdf-cover-placeholder"><FileText size={34} strokeWidth={1.1} /><span title={error}>{!paper.sourcePath ? '待补 PDF' : error ? '首页暂不可用' : 'PDF'}</span></div>}
   </div>
 }

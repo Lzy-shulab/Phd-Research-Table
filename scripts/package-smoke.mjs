@@ -14,7 +14,7 @@ try {
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].hide())
   const errors = []
   page.on('pageerror', error => errors.push(error.message))
-  await page.getByRole('heading', { name: 'Today Plan', exact: true }).waitFor()
+  await page.getByRole('heading', { name: '今日计划', exact: true }).waitFor()
   const result = await page.evaluate(() => window.workbench.bootstrap())
   assert.equal(result.ok, true)
   const runtime = await app.evaluate(({ app, BrowserWindow, screen }) => ({

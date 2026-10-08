@@ -43,6 +43,20 @@
       "when": 1789107241305,
       "tag": "0005_ancient_firebrand",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1789916231618,
+      "tag": "0006_research_workflows",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1790239453025,
+      "tag": "0007_wild_orphan",
+      "breakpoints": true
     }
   ]
 }

@@ -1,11 +1,12 @@
 import { motion } from 'motion/react'
-import { Bot, Database, FolderCog, Monitor, Moon, Palette, Sun } from 'lucide-react'
+import { Bot, Database, FolderCog, Monitor, Moon, Palette, Sun, ChartColumn, CircleGauge, Clock3, Wallet } from 'lucide-react'
 import { appearanceLabels } from '../../../shared/labels'
 import { modules, plannerViews } from '../../app/modules'
 import { useWorkbench } from '../../stores/workbench'
 import { useTasks } from '../../hooks/use-tasks'
 import { useClock } from '../../hooks/use-clock'
 import { dateKey } from '../../lib/dates'
+import { isOverdueTask } from '../../../domain/planner'
 import { cn } from '../../lib/utils'
 import { MiniCalendar } from './MiniCalendar'
 import { LibrarySidebar } from '../literature/LibrarySidebar'
@@ -41,7 +42,8 @@ export function Sidebar() {
                     ? active.filter(
                         (t) =>
                           t.scheduledDate === dateKey(now) ||
-                          (!t.scheduledDate && t.dueDate === dateKey(now))
+                          (!t.scheduledDate && t.dueDate === dateKey(now)) ||
+                          isOverdueTask(t, dateKey(now))
                       ).length
                     : item.id === 'all'
                       ? tasks.length
@@ -71,6 +73,8 @@ export function Sidebar() {
           <OutputsSidebar />
         ) : section === 'submissions' ? (
           <SubmissionsSidebar />
+        ) : section === 'reports' ? (
+          <><nav aria-label="研究报表分类">{[{ id: 'report-goals', label: '周期目标', icon: CircleGauge }, { id: 'report-trends', label: '研究趋势', icon: ChartColumn }, { id: 'report-checkins', label: '研究打卡', icon: Clock3 }, { id: 'report-finance', label: '津贴到账', icon: Wallet }].map(item => <button className="sidebar-link" key={item.id} onClick={() => document.getElementById(item.id)?.scrollIntoView({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' })}><item.icon size={17} /><span>{item.label}</span></button>)}</nav><p className="sidebar-note">阅读、任务与打卡按周期回顾；津贴按年汇总。</p></>
         ) : (
           <>
             <nav aria-label="设置分类">

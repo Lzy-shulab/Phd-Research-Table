@@ -1,15 +1,17 @@
 import { useEffect, useState } from 'react'
-import { Bot, Check, PlugZap } from 'lucide-react'
+import { Bot, Check, CheckCircle2, CircleAlert, FileText, Languages, PlugZap, Sparkles } from 'lucide-react'
 import { assistantProviderLabels, assistantProviders, type AssistantProvider, type AssistantSettingsInput } from '../../../shared/assistant'
-import { useAssistant } from '../../stores/assistant'
+import { assistantConfigured, useAssistant } from '../../stores/assistant'
 import { Button } from '../ui/button'
+import type { TranslationHealth } from '../../../shared/types'
 
 export function AssistantSettings() {
   const settings = useAssistant((state) => state.settings)
   const [provider, setProvider] = useState<AssistantProvider>('siliconflow')
   const [drafts, setDrafts] = useState<Partial<Record<AssistantProvider, AssistantSettingsInput>>>({})
   const [busy, setBusy] = useState(false), [message, setMessage] = useState(''), [error, setError] = useState('')
-  useEffect(() => { void useAssistant.getState().load().then(() => setProvider(useAssistant.getState().settings?.activeProvider ?? 'siliconflow')) }, [])
+  const [translation, setTranslation] = useState<TranslationHealth | null>(null)
+  useEffect(() => { void Promise.all([useAssistant.getState().load().then(() => setProvider(useAssistant.getState().settings?.activeProvider ?? 'siliconflow')), window.workbench.translationHealth().then((result) => { if (result.ok) setTranslation(result.data) })]) }, [])
   const saved = settings?.profiles.find((item) => item.provider === provider)
   const draft = drafts[provider] ?? { provider, model: saved?.model ?? '', baseUrl: saved?.baseUrl ?? '', apiKey: '', clearApiKey: false }
   const patch = (input: Partial<AssistantSettingsInput>) => { setDrafts((current) => ({ ...current, [provider]: { ...draft, ...input } })); setMessage(''); setError('') }
@@ -37,6 +39,13 @@ export function AssistantSettings() {
   }
   return <section id="assistant-settings" className="assistant-settings" aria-labelledby="assistant-settings-heading">
     <div className="storage-section-heading"><Bot size={20} /><div><h2 id="assistant-settings-heading">AI 助手</h2><p>说出计划，自动识别日期、时间和项目。</p></div></div>
+    <div className="capability-readiness" aria-label="AI 与翻译能力状态">
+      <article className={assistantConfigured(settings) ? 'is-ready' : ''}><Sparkles size={18} /><span><strong>计划助手</strong><small>{assistantConfigured(settings) ? `${assistantProviderLabels[settings!.activeProvider]} · 模型与密钥已配置` : '缺少可用模型或 API 密钥；直接录入仍可使用'}</small></span>{assistantConfigured(settings) ? <CheckCircle2 size={17} /> : <CircleAlert size={17} />}</article>
+      <article className={assistantConfigured(settings) ? 'is-ready' : ''}><FileText size={18} /><span><strong>摘要翻译</strong><small>{assistantConfigured(settings) ? '复用计划助手服务；仅发送标题和摘要' : '需要先配置计划助手服务'}</small></span>{assistantConfigured(settings) ? <CheckCircle2 size={17} /> : <CircleAlert size={17} />}</article>
+      <article className={translation?.installed && translation.configured ? 'is-ready' : ''}><Languages size={18} /><span><strong>全文翻译</strong><small>{translation?.message ?? '正在检查 PDF2zh 引擎与翻译模型'}</small></span>{translation?.installed && translation.configured ? <CheckCircle2 size={17} /> : <CircleAlert size={17} />}</article>
+    </div>
+    <p className="assistant-note">三项能力分别保存配置；修改计划助手不会覆盖全文翻译。需要时可主动复用同一 SiliconFlow 服务。</p>
+    {settings?.activeProvider === 'siliconflow' && assistantConfigured(settings) && <Button onClick={async () => { setBusy(true); const result = await window.workbench.reuseAssistantForTranslation(); if (result.ok) { const health = await window.workbench.translationHealth(); if (health.ok) setTranslation(health.data); setMessage('已将当前 SiliconFlow 服务复制到全文翻译配置；后续仍可分别修改模型。') } else setError(result.error.message); setBusy(false) }}><Languages size={15} />复用当前服务到全文翻译</Button>}
     <div className="appearance-card assistant-config">
       <div className="appearance-segments" role="group" aria-label="AI 服务类型">
         {assistantProviders.map((value) => <button key={value} disabled={busy} aria-pressed={provider === value} onClick={() => { setProvider(value); setMessage(''); setError('') }}>{assistantProviderLabels[value]}</button>)}

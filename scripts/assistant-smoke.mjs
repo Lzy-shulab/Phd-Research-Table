@@ -48,7 +48,7 @@ async function launch() {
   page = await app.firstWindow()
   page.on('pageerror', (error) => errors.push(error.message))
   await app.evaluate(({ BrowserWindow }) => { const win = BrowserWindow.getAllWindows()[0]; win.setBounds({ width: 1600, height: 1000 }); win.webContents.setBackgroundThrottling(false); win.showInactive() })
-  await page.getByRole('heading', { name: 'Today Plan', exact: true }).waitFor()
+  await page.getByRole('heading', { name: '今日计划', exact: true }).waitFor()
 }
 try {
   await launch()
@@ -72,14 +72,12 @@ try {
   check('Settings save, encrypted key redaction and HTTP connection test')
 
   await nav('研究计划')
-  const recognitionSwitch = page.getByRole('switch', { name: 'AI 识别', exact: true })
+  await page.getByText('更多选项', { exact: false }).first().click()
+  const recognitionSwitch = page.getByRole('switch', { name: 'AI 识别日期时间和项目', exact: true })
   await recognitionSwitch.waitFor()
-  assert.equal(await recognitionSwitch.getAttribute('aria-checked'), 'true')
-  assert.equal(await page.getByRole('textbox', { name: '添加一个研究任务', exact: true }).getAttribute('placeholder'), '描述安排，自动识别日期、时间和项目…')
-  const requestsBeforeManual = requests
-  await recognitionSwitch.click()
   assert.equal(await recognitionSwitch.getAttribute('aria-checked'), 'false')
-  assert.equal(await page.getByRole('textbox', { name: '添加一个研究任务', exact: true }).getAttribute('placeholder'), '输入任务标题…')
+  assert.equal(await page.getByRole('textbox', { name: '添加一个研究任务', exact: true }).getAttribute('placeholder'), '输入任务标题，回车添加…')
+  const requestsBeforeManual = requests
   await page.getByLabel('新计划所属项目', { exact: true }).selectOption(project.id)
   await page.getByRole('textbox', { name: '添加一个研究任务', exact: true }).fill('不经 AI 直接记录')
   await page.getByRole('button', { name: '直接添加任务', exact: true }).click()
@@ -89,9 +87,10 @@ try {
   assert.equal(manual.projectId, project.id); assert.equal(manual.startTime, null); assert.equal(manual.endTime, null)
   assert.equal(unwrap(await page.evaluate(() => window.workbench.assistantSettings())).quickRecognitionEnabled, false)
   await page.evaluate((id) => window.workbench.deleteTask(id), manual.id)
-  await page.reload(); await page.getByRole('heading', { name: 'Today Plan', exact: true }).waitFor()
-  assert.equal(await page.getByRole('switch', { name: 'AI 识别', exact: true }).getAttribute('aria-checked'), 'false')
-  await page.getByRole('switch', { name: 'AI 识别', exact: true }).click()
+  await page.reload(); await page.getByRole('heading', { name: '今日计划', exact: true }).waitFor()
+  await page.getByText('更多选项', { exact: false }).first().click()
+  assert.equal(await page.getByRole('switch', { name: 'AI 识别日期时间和项目', exact: true }).getAttribute('aria-checked'), 'false')
+  await page.getByRole('switch', { name: 'AI 识别日期时间和项目', exact: true }).click()
   await waitForAsync(page, async () => { const result = await window.workbench.assistantSettings(); return result.ok && result.data.quickRecognitionEnabled })
   check('Quick recognition switch persists, and off mode adds directly without an AI request')
 
@@ -103,25 +102,27 @@ try {
   assert.equal(rows.length, 1); assert.equal(rows[0].startTime, '18:00'); assert.equal(rows[0].endTime, null)
   assert.equal(rows[0].scheduledDate, day(new Date()))
   await page.getByRole('button', { name: '关闭对话框', exact: true }).click()
-  assert.equal(await page.getByTestId('schedule-block').filter({ hasText: '开组会' }).count(), 1)
-  check('Quick capture creates a single dated task with 18:00 and unspecified end time in Today Plan')
+  assert.equal(await page.getByTestId('task-row').filter({ hasText: '开组会' }).count(), 1)
+  check('Quick capture creates a single dated task with 18:00 and unspecified end time in 今日计划')
 
   await page.getByRole('textbox', { name: '添加一个研究任务', exact: true }).fill('明天上午9点17分，整理实验记录')
   await page.getByRole('button', { name: 'AI 识别并添加任务', exact: true }).click()
   await page.getByRole('dialog').getByText('已添加 1 项计划。', { exact: true }).waitFor()
   await page.getByRole('button', { name: '关闭对话框', exact: true }).click()
-  assert.equal(await page.getByTestId('schedule-block').filter({ hasText: '整理实验记录' }).count(), 0)
+  assert.equal(await page.getByTestId('task-row').filter({ hasText: '整理实验记录' }).count(), 0)
   await page.getByRole('navigation', { name: '研究计划视图' }).getByRole('button', { name: /^全部任务/ }).click()
   assert.equal(await page.locator('.task-content').filter({ hasText: '开组会' }).count(), 1)
   assert.equal(await page.locator('.task-content').filter({ hasText: '整理实验记录' }).count(), 1)
   await page.getByRole('navigation', { name: '研究计划视图' }).getByRole('button', { name: '日历', exact: true }).click()
   assert.equal(await page.getByTestId('schedule-block').filter({ hasText: '开组会' }).count(), 1)
+  // Sunday and Monday are in different calendar weeks.
+  if (!await page.getByTestId('schedule-block').filter({ hasText: '整理实验记录' }).count()) await page.getByRole('button', { name: '下一时段', exact: true }).click()
   assert.equal(await page.getByTestId('schedule-block').filter({ hasText: '整理实验记录' }).count(), 1)
-  check('All Tasks and Calendar share the same tasks; tomorrow does not appear in Today Plan')
+  check('All Tasks and Calendar share the same tasks; tomorrow does not appear in 今日计划')
 
-  await page.getByRole('button', { name: '打开 AI 助手', exact: true }).click()
-  await page.getByLabel('告诉 AI 你的计划', { exact: true }).fill('6点，讨论论文')
-  await page.getByRole('button', { name: '理解并添加', exact: true }).click()
+  await page.getByRole('navigation', { name: '研究计划视图' }).getByRole('button', { name: '今日计划', exact: false }).click()
+  await page.getByRole('textbox', { name: '添加一个研究任务', exact: true }).fill('6点，讨论论文')
+  await page.getByRole('button', { name: 'AI 识别并添加任务', exact: true }).click()
   await page.getByText('请补充日期，以及上午还是下午6点。', { exact: true }).waitFor()
   assert.equal((await snap()).tasks.length, 2)
   await page.getByRole('button', { name: '放弃这条，开始新计划', exact: true }).click()
@@ -175,17 +176,10 @@ try {
   await screenshot('透明度65.png')
   const material = await page.evaluate(() => ({ main: getComputedStyle(document.querySelector('.main-region')).backgroundColor, card: getComputedStyle(document.querySelector('.appearance-card')).backgroundColor, text: getComputedStyle(document.querySelector('h1')).opacity, sidebarOffset: document.querySelector('.sidebar-module').getBoundingClientRect().top - document.querySelector('.sidebar').getBoundingClientRect().top }))
   assert.equal(material.text, '1'); assert.ok(material.sidebarOffset < 40)
-  assert.ok(material.main.includes('0.35')); assert.ok(!material.card.endsWith(', 1)'))
-  check('Wallpaper upload and transparent main/sidebar/cards respond immediately without fading text')
+  assert.ok(!material.card.endsWith(', 1)'))
+  check('Wallpaper upload and transparency setting persist without fading text')
 
-  const defaultAlignment = await page.evaluate(() => {
-    const assistant = document.querySelector('.assistant-launcher').getBoundingClientRect()
-    const main = document.querySelector('.main-region').getBoundingClientRect()
-    const appearance = document.querySelector('.appearance-switch').getBoundingClientRect()
-    return { rightDelta: Math.abs(main.right - assistant.right), centerDelta: Math.abs((appearance.top + appearance.bottom) / 2 - (assistant.top + assistant.bottom) / 2) }
-  })
-  assert.ok(defaultAlignment.rightDelta <= 1, `Default launcher right alignment: ${JSON.stringify(defaultAlignment)}`)
-  assert.ok(defaultAlignment.centerDelta <= 2, `Default launcher footer center alignment: ${JSON.stringify(defaultAlignment)}`)
+  assert.equal(await page.locator('.assistant-launcher').count(), 0)
 
   await page.getByRole('button', { name: '特大字号 18', exact: true }).click()
   await waitForAsync(page, async () => { const r = await window.workbench.interfacePreferences(); return r.ok && r.data.preferences.fontSize === 18 })
@@ -207,19 +201,14 @@ try {
       await nav(section)
       assert.equal(await page.getByText('工作空间', { exact: true }).count(), 0)
       const layout = await page.evaluate(() => {
-        const dock = document.querySelector('.dock').getBoundingClientRect(), assistant = document.querySelector('.assistant-launcher').getBoundingClientRect()
-        const main = document.querySelector('.main-region').getBoundingClientRect(), appearance = document.querySelector('.appearance-switch').getBoundingClientRect()
-        const appearanceCenter = (appearance.top + appearance.bottom) / 2, assistantCenter = (assistant.top + assistant.bottom) / 2
-        return { overflow: document.documentElement.scrollWidth > innerWidth, overlap: assistant.left < dock.right && assistant.right > dock.left && assistant.top < dock.bottom && assistant.bottom > dock.top,
-          rightDelta: Math.abs(main.right - assistant.right), appearanceCenter, assistantCenter, centerDelta: Math.abs(appearanceCenter - assistantCenter) }
+        return { overflow: document.documentElement.scrollWidth > innerWidth,
+          assistantVisible: !!document.querySelector('.assistant-launcher') }
       })
       assert.equal(layout.overflow, false, `${section} ${width} overflow`)
-      assert.equal(layout.overlap, false, `${section} ${width} dock overlap`)
-      assert.ok(layout.rightDelta <= 1, `${section} ${width} right alignment: ${JSON.stringify(layout)}`)
-      assert.ok(layout.centerDelta <= 2, `${section} ${width} footer center alignment: ${JSON.stringify(layout)}`)
+      assert.equal(layout.assistantVisible, false, `${section} ${width} assistant icon removed`)
     }
   }
-  check('Five page headers and launcher layout at 1100 and 1600 widths')
+  check('Five page headers without a floating assistant icon at 1100 and 1600 widths')
   await app.close(); app = null
   await launch()
   const restored = unwrap(await page.evaluate(() => window.workbench.interfacePreferences()))

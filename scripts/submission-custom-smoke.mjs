@@ -72,15 +72,14 @@ try {
     window.webContents.setBackgroundThrottling(false)
     window.showInactive()
   })
-  await page.getByRole('heading', { name: 'Today Plan', exact: true }).waitFor()
+  await page.getByRole('heading', { name: '今日计划', exact: true }).waitFor()
   await page.evaluate(
-    ({ inputs }) =>
-      Promise.all(
-        inputs.map(async (item) => {
-          const result = await window.workbench.createSubmission(item)
-          if (!result.ok) throw new Error(result.error.message)
-        })
-      ),
+    async ({ inputs }) => {
+      for (const item of inputs) {
+        const result = await window.workbench.createSubmission(item)
+        if (!result.ok) throw new Error(result.error.message)
+      }
+    },
     {
       inputs: [
         input(2, 'Two recorded states'),

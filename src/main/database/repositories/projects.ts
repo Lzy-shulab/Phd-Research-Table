@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import { asc, eq } from 'drizzle-orm'
-import { projects, tasks } from '../schema'
+import { projects, tasks, submissions } from '../schema'
 import type { WorkbenchDatabase } from '../db'
-import type { Project, ProjectInput, ProjectPatch } from '../../../shared/types'
+import type { Project, ProjectInput, ProjectPatch, ProjectTaskAction } from '../../../shared/types'
 import { DomainError } from '../../../domain/errors'
 
 export class ProjectRepository {
@@ -34,20 +34,24 @@ export class ProjectRepository {
     this.db.update(projects).set(next).where(eq(projects.id, id)).run()
     return next
   }
-  delete(id: string, moveToId?: string): void {
+  delete(id: string, moveToId?: string, taskAction?: ProjectTaskAction): void {
     this.get(id)
-    if (moveToId) {
+    const action = taskAction ?? (moveToId ? 'transfer' : undefined)
+    if (action === 'transfer') {
+      if (!moveToId) throw new DomainError('VALIDATION', '请选择接收任务的项目。')
       const destination = this.get(moveToId)
       if (destination.id === id || destination.archivedAt)
         throw new DomainError('VALIDATION', '请选择另一个未归档项目接收计划。')
     }
-    if (!moveToId && this.db.select({ id: tasks.id }).from(tasks).where(eq(tasks.projectId, id)).get())
-      throw new DomainError('VALIDATION', '项目中还有计划，请先将计划转移到其他项目，或使用归档保留它们。')
+    if (!action && this.db.select({ id: tasks.id }).from(tasks).where(eq(tasks.projectId, id)).get())
+      throw new DomainError('VALIDATION', '项目中还有任务，请明确选择删除、保留或转移任务。')
     this.db.transaction((tx) => {
-      tx.update(tasks)
-        .set({ projectId: moveToId ?? null, updatedAt: new Date().toISOString() })
-        .where(eq(tasks.projectId, id))
-        .run()
+      if (action === 'delete') tx.delete(tasks).where(eq(tasks.projectId, id)).run()
+      else tx.update(tasks)
+          .set({ projectId: action === 'transfer' ? moveToId : null, updatedAt: new Date().toISOString() })
+          .where(eq(tasks.projectId, id)).run()
+      // Older databases use a restrictive foreign key here. Keep manuscript history intact.
+      tx.update(submissions).set({ projectId: null }).where(eq(submissions.projectId, id)).run()
       tx.delete(projects).where(eq(projects.id, id)).run()
     })
   }

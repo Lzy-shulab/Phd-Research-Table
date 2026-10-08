@@ -7,6 +7,14 @@ const stage = z.object({
   name: z.string().trim().min(1, '请填写状态名称。').max(160, '状态名称不能超过 160 个字符。'),
   occurredOn: z.string().refine(isCalendarDate, '请填写有效的状态日期。')
 }).strict()
+const reviewItem = z.object({
+  id: z.uuid(),
+  reviewer: z.string().trim().max(100),
+  content: z.string().trim().min(1, '请填写返修待办内容。').max(5000),
+  completed: z.boolean(),
+  materialLink: z.string().trim().max(2000),
+  taskId: z.uuid().nullable()
+}).strict()
 export const submissionSchema = z.object({
   title: z.string().trim().min(1, '请填写论文标题。').max(1000),
   journal: z.string().trim().min(1, '请填写投稿期刊或会议。').max(500),
@@ -15,7 +23,14 @@ export const submissionSchema = z.object({
   revisionDueDate: date,
   reminderEnabled: z.boolean(),
   reminderDays: z.number().int().min(0).max(30),
-  notes: z.string().max(50000)
+  notes: z.string().max(50000),
+  revisionCompleted: z.boolean().optional(),
+  ended: z.boolean().optional(),
+  projectId: z.uuid().nullable().optional(),
+  manuscriptPaperId: z.uuid().nullable().optional(),
+  manuscriptGroupId: z.uuid().optional(),
+  sourceSubmissionId: z.uuid().nullable().optional(),
+  reviewItems: z.array(reviewItem).max(100).optional()
 }).strict().superRefine((input, context) => {
   const ids = input.stages.flatMap((item) => item.id ? [item.id] : [])
   if (new Set(ids).size !== ids.length)

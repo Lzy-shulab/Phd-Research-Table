@@ -1,0 +1,97 @@
+/* Containment uses the actual workspace width, including the expanded sidebar. */
+.workspace-stage, .literature-workspace, .outputs-workspace, .settings-workspace { min-width: 0; max-width: 100%; }
+.literature-workspace { container: library / inline-size; }
+.library-toolbar { min-width: 0; flex-shrink: 0; width: 100%; gap: 10px; }
+.library-search { min-width: 0; flex: 1 1 260px; }
+.library-search input { min-width: 0; width: 0; }
+.library-search > svg { flex-shrink: 0; }
+.library-toolbar > select { min-width: 0; max-width: 100%; }
+@container library (max-width: 860px) {
+  .library-toolbar > .library-search { flex-basis: 100%; }
+  .library-toolbar > .view-switch { margin-left: auto; }
+}
+.sidebar-link { min-width: 0; }
+.sidebar-link:hover { transform: none; }
+.sidebar-link > span:not(.nav-selection):not(.nav-count) { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.paper-card, .submission-card, .plan-note, .report-panel { min-width: 0; }
+.paper-card-actions { gap: 6px; }
+.paper-card-actions button { min-width: 0; padding-inline: 5px; white-space: nowrap; font-size: .8rem; }
+.paper-metadata-row { flex-wrap: wrap; row-gap: 2px; }
+.paper-metadata-row > span { overflow-wrap: anywhere; }
+.workspace-header > div:first-child { min-width: 0; }
+.workspace-header h1 { overflow-wrap: anywhere; }
+.workspace-actions { flex-shrink: 0; }
+.appearance-setting-heading { flex-wrap: wrap; }
+.appearance-segments { min-width: 0; }
+.storage-actions { flex-wrap: wrap; }
+.dock-wrap { pointer-events: none; }
+.dock-wrap[data-revealed='false'] { pointer-events: auto; }
+.dock, .dock-reveal-handle { pointer-events: auto; }
+button { transition: background-color 160ms var(--motion-ease), color 160ms var(--motion-ease), border-color 160ms var(--motion-ease), box-shadow 180ms var(--motion-ease); }
+:is(.paper-card, .submission-card, .plan-note, .report-panel) { transition: border-color 180ms var(--motion-ease), box-shadow 180ms var(--motion-ease); }
+:is(.paper-card, .submission-card, .plan-note):hover { border-color: var(--accent); box-shadow: 0 5px 15px #10282026; }
+:is(.paper-card-actions button, .publication-card-footer button, .reader-annotation-jump, .sidebar-link):hover:not(:disabled) { background: var(--accent-soft); }
+:is(.icon-button, .paper-more, .reader-annotation-remove) svg { transition: transform 170ms var(--motion-ease); }
+:is(.icon-button, .paper-more):hover:not(:disabled) svg { transform: scale(1.1); }
+.reader-annotation-remove:hover svg { transform: translateY(-1px); }
+:is(.segmented-control, .view-switch, .plan-layout-switch, .appearance-segments) button:active:not(:disabled) { transform: scale(.97); }
+.reader-annotations-heading button[aria-pressed='true'], .reader-annotation-filters button[aria-pressed='true'] { background: var(--accent-soft); color: var(--text-primary); box-shadow: inset 0 0 0 1px var(--accent); }
+.reader-note-status { color: var(--text-secondary); }
+.reader-note-status:hover { color: var(--accent); }
+
+/* Keep the transparent PDF text layer invisible even while it is selected. */
+:root .reader-dialog .pdf-page .textLayer ::selection { color: transparent !important; background: #4285c33d; text-shadow: none; }
+:root .reader-dialog .pdf-page .textLayer br::selection { background: transparent; }
+.pdf-highlight-layer, .pdf-page .textLayer { mix-blend-mode: multiply; }
+.pdf-page[data-rendered='false'] .textLayer { visibility: hidden; pointer-events: none; }
+.reader-dialog.dialog-content { width: calc(100vw - 32px); height: calc(100dvh - 32px); max-width: none; }
+.reader-toolbar { grid-template-columns: minmax(140px, 1fr) auto minmax(250px, 1fr); gap: 10px; }
+.reader-highlight-hint { display: none; }
+.reader-center-tools { min-width: 0; }
+.reader-with-notes { display: grid; grid-template-columns: minmax(0, 1fr) clamp(270px, 21vw, 330px); }
+.reader-with-notes.notes-collapsed { grid-template-columns: minmax(0, 1fr); }
+.reader-scroll { padding: 22px 24px; scrollbar-gutter: stable; }
+.reader-notes-panel { min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--surface-raised); border-left: 1px solid var(--border-default); }
+.reader-notes-panel > header { display: flex; align-items: center; gap: 8px; padding: 16px; border-bottom: 1px solid var(--border-default); }
+.reader-notes-panel h2 { font-size: 1rem; font-weight: 650; }
+.reader-notes-panel > header > svg { color: var(--accent); flex-shrink: 0; }
+.reader-note-status { margin-left: auto; font-size: .72rem; white-space: nowrap; }
+.reader-notes-scroll { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 16px; display: grid; align-content: start; gap: 24px; }
+.reader-note-field { display: grid; gap: 8px; font-size: .84rem; font-weight: 600; }
+.reader-note-field textarea { width: 100%; min-height: 150px; resize: vertical; padding: 12px; font-size: .85rem; font-weight: 400; line-height: 1.7; background: var(--surface-inset); border: 1px solid var(--border-default); border-radius: 8px; }
+.reader-annotations-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+.reader-annotations-heading h3 { font-size: .9rem; }
+.reader-annotations-heading button { border-radius: 5px; padding: 5px 8px; font-size: .75rem; }
+.reader-annotation-filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-bottom: 14px; }
+.reader-annotation-filters small { margin-left: auto; font-variant-numeric: tabular-nums; }
+.reader-annotation-list { display: grid; gap: 10px; }
+.reader-annotation { position: relative; background: var(--surface-inset); border-radius: 8px; border: 1px solid transparent; }
+.reader-annotation.is-active { border-color: var(--accent); }
+.reader-annotation-jump { width: 100%; display: grid; gap: 8px; padding: 12px; border-radius: inherit; text-align: left; }
+.reader-annotation-jump > span { display: flex; align-items: center; gap: 6px; padding-right: 22px; font-size: .75rem; color: var(--text-secondary); }
+.reader-annotation-jump small { margin-left: auto; white-space: nowrap; }
+.reader-annotation-jump i { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.highlight-focus { --highlight-dot: #d8a827; }.highlight-method { --highlight-dot: #47a878; }.highlight-evidence { --highlight-dot: #438fce; }.highlight-question { --highlight-dot: #cb6588; }
+.reader-annotation-jump i { background: var(--highlight-dot); }
+.reader-annotation-jump p { font-size: .82rem; line-height: 1.65; overflow-wrap: anywhere; white-space: pre-wrap; }
+.reader-annotation-remove { position: absolute; right: 4px; top: 4px; padding: 6px; border-radius: 5px; color: var(--text-secondary); }
+.reader-annotation-remove:hover { color: var(--danger); background: var(--danger-subtle); }
+.reader-annotation-empty { color: var(--text-secondary); font-size: .82rem; line-height: 1.7; }
+.pdf-highlight.is-located { outline: 2px solid #326c95; outline-offset: 2px; animation: annotation-locate 800ms ease-out; }
+@keyframes annotation-locate { from { outline-offset: 6px; } to { outline-offset: 2px; } }
+.reader-footer { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); font-size: .75rem; }
+.reader-footer > span { min-width: 0; }
+@media (max-width: 1250px) {
+  .reader-toolbar { grid-template-columns: minmax(140px, 1fr) auto auto; padding-inline: 16px; }
+  .reader-toolbar .button { font-size: .8rem; padding-inline: 8px; }
+  .reader-footer > span:last-child { display: none; }
+  .reader-footer { grid-template-columns: 1fr auto; }
+  .reader-scroll { padding-inline: 16px; }
+  .theme-setting { flex-wrap: wrap; }
+}
+@media (prefers-reduced-motion: reduce) {
+  :is(.icon-button, .paper-more, .reader-annotation-remove):hover svg,
+  :is(.segmented-control, .view-switch, .plan-layout-switch, .appearance-segments) button:active { transform: none; }
+  .pdf-highlight.is-located { animation: none; }
+  button { transition-duration: 80ms; }
+}

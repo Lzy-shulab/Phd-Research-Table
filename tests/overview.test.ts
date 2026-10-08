@@ -8,6 +8,7 @@ import { PaperOverviewService } from '../src/main/library/overview'
 import { LibraryRepository } from '../src/main/database/repositories/library'
 import { openDatabase, type DatabaseConnection } from '../src/main/database/db'
 import { paperMetadataDefaults } from '../src/shared/arxiv'
+import type { ArxivCandidate } from '../src/shared/types'
 
 const resources: { directory: string; connection: DatabaseConnection }[] = []
 afterEach(() => { for (const { directory, connection } of resources.splice(0)) { connection.close(); rmSync(directory, { recursive: true, force: true }) } })
@@ -25,6 +26,51 @@ function setup(abstract = 'We present an image classification method and evaluat
   return { connection, repo, paper, translate, service }
 }
 describe('Paper overview translation', () => {
+  it('retains legacy cached translations and a manually supplied original abstract', async () => {
+    const { repo, paper, service, translate } = setup('')
+    const previous = { ...translation, generatedAt: new Date().toISOString(), sourceAbstract: 'A manually supplied original abstract.' }
+    repo.setSetting(`paper.overview.v1.${paper.id}`, JSON.stringify(previous))
+    expect(service.read(paper.id)).toEqual(previous)
+    expect(await service.generate({ id: paper.id })).toEqual(previous)
+    expect(translate).not.toHaveBeenCalled()
+    repo.updatePaper(paper.id, { title: 'Updated title' })
+    await service.generate({ id: paper.id, regenerate: true })
+    expect(translate).toHaveBeenLastCalledWith('Updated title', previous.sourceAbstract)
+  })
+  const candidate: ArxivCandidate = {
+    id: '2609.10001v1', arxivId: '2609.10001', pdfId: '2609.10001v1', title: 'A candidate paper',
+    authors: 'Fixture Author', abstract: 'A full candidate abstract for research screening.', journal: '',
+    publishedDate: '2026-09-27', doi: '', matchReason: 'fixture', favorite: false, ignored: false
+  }
+  it('previews uncollected candidates once, reuses persisted translations, and leaves library papers unchanged', async () => {
+    const { connection, repo, paper, translate } = setup()
+    const lookup = () => candidate
+    const service = new PaperOverviewService(() => connection, translate, lookup)
+    const [first, second] = await Promise.all([service.generateCandidate({ id: candidate.id }), service.generateCandidate({ id: candidate.id })])
+    expect(second).toEqual(first)
+    expect(translate).toHaveBeenCalledTimes(1)
+    expect(translate).toHaveBeenCalledWith(candidate.title, candidate.abstract)
+    const restarted = new PaperOverviewService(() => connection, translate, lookup)
+    expect(await restarted.generateCandidate({ id: candidate.id })).toEqual(first)
+    expect(translate).toHaveBeenCalledTimes(1)
+    expect(repo.papers()).toEqual([paper])
+    translate.mockRejectedValueOnce(new Error('Unavailable'))
+    await expect(restarted.generateCandidate({ id: candidate.id, regenerate: true })).rejects.toThrow('Unavailable')
+    expect(await restarted.generateCandidate({ id: candidate.id })).toEqual(first)
+  })
+  it('invalidates changed candidate content and rejects a removed candidate before caching its response', async () => {
+    const { connection, repo, translate } = setup()
+    let current: ArxivCandidate | undefined = { ...candidate }
+    const service = new PaperOverviewService(() => connection, translate, () => current)
+    await service.generateCandidate({ id: candidate.id })
+    current = { ...candidate, title: 'Updated candidate' }
+    await service.generateCandidate({ id: candidate.id })
+    expect(translate).toHaveBeenLastCalledWith('Updated candidate', candidate.abstract)
+    const priorCache = repo.setting(`paper.overview.candidate.v1.${candidate.id}`, '')
+    translate.mockImplementationOnce(async () => { current = undefined; return translation })
+    await expect(service.generateCandidate({ id: candidate.id, regenerate: true })).rejects.toThrow(/候选内容已变化/)
+    expect(repo.setting(`paper.overview.candidate.v1.${candidate.id}`, '')).toBe(priorCache)
+  })
   it('extracts only a marked and bounded abstract, never introduction text', () => {
     const body = 'We present a classification method. It preserves spectral information and uses two datasets.'
     expect(extractPaperAbstract(`Title\nAbstract—${body}\nIndex Terms—classification\nI. Introduction\nUnrelated`)).toBe(body)
@@ -32,9 +78,12 @@ describe('Paper overview translation', () => {
     expect(extractPaperAbstract(`Introduction\n${body}`)).toBeNull()
     expect(extractPaperAbstract(`Abstract\n${body}`)).toBeNull()
   })
-  it('requires exactly a Chinese title and abstract', () => {
+  it('normalizes provider field names and keeps only the Chinese title and abstract', () => {
     expect(parseOverviewTranslation('```json\n' + JSON.stringify(translation) + '\n```')).toEqual(translation)
-    for (const value of [{ ...translation, summary: 'extra' }, { titleZh: 'English only', abstractZh: 'English only' }, { titleZh: '题目', abstractZh: '' }])
+    expect(parseOverviewTranslation(JSON.stringify({ titleZh: translation.titleZh, abstract: translation.abstractZh }))).toEqual(translation)
+    expect(parseOverviewTranslation(JSON.stringify({ title: translation.titleZh, abstract: translation.abstractZh }))).toEqual(translation)
+    expect(parseOverviewTranslation(JSON.stringify({ ...translation, summary: 'extra' }))).toEqual(translation)
+    for (const value of [{ titleZh: 'English only', abstractZh: 'English only' }, { titleZh: '题目', abstractZh: '' }, { titleZh: '题目', abstract: 'Original English abstract.' }])
       expect(() => parseOverviewTranslation(JSON.stringify(value))).toThrow(/中文/)
   })
   it('deduplicates requests, persists across services, and leaves paper fields and full translation untouched', async () => {

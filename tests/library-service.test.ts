@@ -28,6 +28,7 @@ function setup(withWindow = false) {
   const directory = mkdtempSync(join(tmpdir(), 'library-service-'))
   const connection = openDatabase(join(directory, 'workbench.sqlite'), resolve('src/main/database/migrations'))
   const service = new LibraryService(connection, () => withWindow ? { isDestroyed: () => false, webContents: { send: vi.fn() } } as unknown as BrowserWindow : null, protector)
+  service.arxiv.setTranslator(async id => ({ titleZh: '高光谱图像测试', abstractZh: '这是一段用于文献服务测试的高光谱摘要。', generatedAt: new Date().toISOString(), sourceAbstract: service.arxiv.candidate(id)!.abstract }))
   service.translationProfiles.save({ id: 'siliconflow-api', name: 'SiliconFlow 自有额度', provider: 'siliconflow', model: 'Qwen/Qwen3-8B', baseUrl: 'https://api.siliconflow.cn/v1', apiKey: 'test-key' })
   const config = join(directory, 'engine', 'config')
   mkdirSync(config, { recursive: true }); writeFileSync(join(config, 'config.toml.example'), '')
@@ -86,11 +87,12 @@ describe('Library jobs with a stub translation process', () => {
     let id = '2609.12345'
     const day = localDay()
     arxivNetwork.fetch.mockImplementation(async (url: string) => new Response(url.includes('/api/')
-      ? `<feed><entry><id>https://arxiv.org/abs/${id}v1</id><title>Hyperspectral image test</title><published>${day}T00:00:00Z</published></entry></feed>`
+      ? `<feed><entry><id>https://arxiv.org/abs/${id}v1</id><title>Hyperspectral image test</title><summary>A hyperspectral image abstract for storage and translation testing.</summary><published>${day}T00:00:00Z</published></entry></feed>`
       : `%PDF-1.7\nArxiv storage ${id}\n%%EOF`))
     service.arxiv.configure({ ...defaultArxivSettings, maxPerDay: 2, directions: ['hyperspectral image'] })
     service.arxiv.start()
     await vi.waitFor(() => expect(service.arxiv.snapshot().running).toBe(false), { timeout: 8000 })
+    await service.arxiv.candidateAction(service.arxiv.snapshot().candidates[0]!.id, 'download')
     const originals = service.repo.papers()
     expect(originals).toHaveLength(3)
     const directories = { library: join(directory, '新文献'), publication: join(directory, '新成果'), arxiv: join(directory, '每日下载') }
@@ -114,6 +116,7 @@ describe('Library jobs with a stub translation process', () => {
     service.arxiv.configure({ ...defaultArxivSettings, maxPerDay: 2, directions: ['hyperspectral'] })
     service.arxiv.start()
     await vi.waitFor(() => expect(service.arxiv.snapshot().running).toBe(false), { timeout: 10000 })
+    await service.arxiv.candidateAction(service.arxiv.snapshot().candidates[0]!.id, 'download')
     const added = service.repo.papers().filter((paper) => !originals.some((old) => old.id === paper.id))
     expect(added).toHaveLength(3)
     for (const paper of added) expect(paper.sourcePath).toBe(join(directories[paper.collection], ...(paper.collection === 'arxiv' ? [day] : []), paper.id, 'source.pdf'))
@@ -149,11 +152,12 @@ describe('Library jobs with a stub translation process', () => {
     const { service } = setup()
     const day = localDay()
     arxivNetwork.fetch.mockImplementation(async (url: string) => new Response(url.includes('/api/')
-      ? `<feed><entry><id>https://arxiv.org/abs/2609.12345v1</id><title>Hyperspectral image test</title><published>${day}T00:00:00Z</published></entry></feed>`
+      ? `<feed><entry><id>https://arxiv.org/abs/2609.12345v1</id><title>Hyperspectral image test</title><summary>A hyperspectral image abstract for storage and translation testing.</summary><published>${day}T00:00:00Z</published></entry></feed>`
       : '%PDF-1.7\nArxiv source fixture\n%%EOF'))
     service.arxiv.configure({ ...defaultArxivSettings, maxPerDay: 1, directions: ['hyperspectral image'] })
     service.arxiv.start()
     await vi.waitFor(() => expect(service.arxiv.snapshot().running).toBe(false), { timeout: 8000 })
+    await service.arxiv.candidateAction(service.arxiv.snapshot().candidates[0]!.id, 'download')
     const paper = service.repo.papers()[0]!
     expect(paper.translationStatus).toBe('idle')
     expect(paper.sourcePath).toContain(join('Arxiv Daily', day, paper.id))

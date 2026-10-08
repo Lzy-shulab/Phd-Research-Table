@@ -7,6 +7,8 @@
 .wallpaper-mist { background-image: radial-gradient(ellipse at 12% 12%, #b6cbec, transparent 62%), radial-gradient(ellipse at 92% 92%, #ccc3e5, transparent 60%), linear-gradient(135deg, #e4edf5, #e9eaf5); }
 .wallpaper-sage { background-image: radial-gradient(ellipse at 10% 18%, #b4cec3, transparent 62%), radial-gradient(ellipse at 90% 92%, #d5d1b7, transparent 58%), linear-gradient(135deg, #e6f0ea, #eef0e2); }
 .wallpaper-dusk { background-image: radial-gradient(ellipse at 12% 10%, #d4c0dd, transparent 56%), radial-gradient(ellipse at 90% 88%, #e4c7b6, transparent 60%), linear-gradient(145deg, #e7dfed, #f0e7e2); }
+.wallpaper-midnight { background-image: radial-gradient(circle at 15% 12%, #2c3550 0, transparent 38%), radial-gradient(circle at 88% 84%, #172a3e 0, transparent 42%), linear-gradient(145deg, #05070b, #0d111a 58%, #05070b); }
+.wallpaper-klein { background-image: radial-gradient(circle at 16% 14%, #315bea 0, transparent 36%), radial-gradient(circle at 86% 82%, #001964 0, transparent 46%), linear-gradient(145deg, #062db0, #002fa7 54%, #001b70); }
 [data-theme='dark'] .wallpaper-mist { background-image: radial-gradient(ellipse at 5% 10%, #30456a, transparent 68%), radial-gradient(ellipse at 94% 90%, #433753, transparent 68%), linear-gradient(135deg, #192536, #26263b); }
 [data-theme='dark'] .wallpaper-sage { background-image: radial-gradient(ellipse at 5% 10%, #325349, transparent 68%), radial-gradient(ellipse at 94% 90%, #45452d, transparent 65%), linear-gradient(135deg, #1c302a, #292e22); }
 [data-theme='dark'] .wallpaper-dusk { background-image: radial-gradient(ellipse at 5% 10%, #513854, transparent 68%), radial-gradient(ellipse at 94% 90%, #593c38, transparent 65%), linear-gradient(135deg, #282131, #362622); }
@@ -41,9 +43,12 @@
 .appearance-segments button { display: flex; align-items: center; gap: 6px; padding: 8px 13px; min-height: 36px; border-radius: 8px; font-size: 0.857143rem; color: var(--text-secondary); position: relative; isolation: isolate; }
 .appearance-segments button[aria-pressed='true'] { color: var(--text-primary); }
 .appearance-selection { position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: var(--surface-solid); box-shadow: 0 1px 5px #162c4914, inset 0 0 0 1px var(--border-subtle); pointer-events: none; }
-.background-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 14px; margin-top: 20px; }
+.background-setting { container: backgrounds / inline-size; }
+.background-options { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 20px 18px; margin-top: 20px; }
+@container backgrounds (max-width: 680px) { .background-options { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@container backgrounds (max-width: 350px) { .background-options { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .background-option { min-width: 0; display: flex; flex-direction: column; gap: 9px; align-items: center; color: var(--text-secondary); font-size: 0.857143rem; padding: 4px; border-radius: 12px; }
-.background-preview { width: 100%; height: clamp(70px, 6.8vw, 100px); border: 1px solid var(--border-default); border-radius: 10px; display: flex; align-items: flex-end; justify-content: flex-end; padding: 8px; box-shadow: inset 0 1px 0 #ffffff40; transition: box-shadow 160ms ease, border-color 160ms ease; }
+.background-preview { width: 100%; height: auto; aspect-ratio: 1.8; border: 1px solid var(--border-default); border-radius: 10px; display: flex; align-items: flex-end; justify-content: flex-end; padding: 8px; box-shadow: inset 0 1px 0 #ffffff40; transition: box-shadow 160ms ease, border-color 160ms ease; }
 .background-option:hover .background-preview { border-color: var(--accent); }
 .background-option[aria-pressed='true'] { color: var(--text-primary); font-weight: 600; }
 .background-option[aria-pressed='true'] .background-preview { box-shadow: 0 0 0 2px var(--surface-solid), 0 0 0 4px var(--accent); }
@@ -112,7 +117,13 @@
 .paper-overview-content h3::before { content: ''; width: 5px; height: 5px; flex: 0 0 5px; border-radius: 50%; background: var(--accent); }
 .paper-overview-content h2 { font-size: 1.285714rem; line-height: 1.6; margin: 0; overflow-wrap: anywhere; }
 .paper-overview-content p { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.9; margin: 0; }
-.paper-overview-loading { display: flex; align-items: center; gap: 10px; padding: 24px 0; color: var(--text-secondary); }
+.paper-overview-loading { display: grid; gap: 9px; padding: 17px 2px 21px; color: var(--text-secondary); }
+.paper-overview-progress-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; font-size: 0.86rem; }
+.paper-overview-progress-heading strong { color: var(--accent); font-size: 0.78rem; font-weight: 650; font-variant-numeric: tabular-nums; }
+.paper-overview-progress { height: 7px; overflow: hidden; border-radius: 999px; background: var(--surface-secondary); box-shadow: inset 0 1px 2px #1023341c; }
+.paper-overview-progress > i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 62%, #8ed6cf)); transition: width 180ms ease; }
+.paper-overview-progress > i.is-indeterminate { width: 34%; animation: paper-overview-progress 1.25s ease-in-out infinite; }
+@keyframes paper-overview-progress { from { transform: translateX(-110%); } to { transform: translateX(395%); } }
 .paper-overview-source textarea { width: 100%; min-height: 180px; margin-top: 8px; resize: vertical; }
 .paper-tags { height: auto; min-height: 23px; }
 .arxiv-daily-panel { padding: 16px 20px 10px; margin-bottom: 16px; }
@@ -146,6 +157,7 @@
 @media (prefers-reduced-motion: reduce) {
   .wallpaper-scrim, .background-preview { transition: none; }
   .translation-progress-track > .translation-indeterminate { animation: none; transform: none; width: 100%; opacity: 0.25; }
+  .paper-overview-progress > i.is-indeterminate { animation: none; width: 100%; opacity: 0.3; }
   .background-option:active:not(:disabled) .background-preview { transform: none; }
 }
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {

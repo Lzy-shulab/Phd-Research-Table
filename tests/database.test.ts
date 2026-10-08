@@ -51,12 +51,14 @@ describe('SQLite persistence and domain invariants', () => {
     }
     old.close()
     const upgraded = database(path)
-    expect(upgraded.sqlite.prepare('SELECT * FROM tasks ORDER BY id').all()).toEqual(before.tasks)
+    const upgradedTasks = upgraded.sqlite.prepare('SELECT * FROM tasks ORDER BY id').all() as Record<string, unknown>[]
+    expect(upgradedTasks).toHaveLength(before.tasks.length)
+    for (const [index, row] of (before.tasks as Record<string, unknown>[]).entries()) expect(upgradedTasks[index]).toMatchObject(row)
     expect(upgraded.sqlite.prepare('SELECT * FROM projects').all()).toEqual(before.projects)
     expect(upgraded.sqlite.prepare('SELECT * FROM app_settings').all()).toEqual(before.settings)
     expect(upgraded.sqlite.prepare('SELECT * FROM library_folders').all()).toEqual([])
     expect(upgraded.sqlite.prepare('SELECT * FROM papers').all()).toEqual([])
-    expect(upgraded.sqlite.prepare('SELECT * FROM __drizzle_migrations').all()).toHaveLength(6)
+    expect(upgraded.sqlite.prepare('SELECT * FROM __drizzle_migrations').all()).toHaveLength(8)
     expect(upgraded.sqlite.pragma('integrity_check', { simple: true })).toBe('ok')
     expect(upgraded.sqlite.pragma('foreign_key_check')).toEqual([])
     upgraded.close()
@@ -160,7 +162,7 @@ describe('SQLite persistence and domain invariants', () => {
     tasks.update(task.id, { description: 'Still editable' })
     projects.update(project.id, { archived: false })
     expect(projects.get(project.id).archivedAt).toBeNull()
-    expect(() => projects.delete(project.id)).toThrow('项目中还有计划')
+    expect(() => projects.delete(project.id)).toThrow('项目中还有任务')
     const destination = projects.create({ name: 'Research', description: '', colorKey: 'sage' })
     projects.delete(project.id, destination.id)
     expect(tasks.get(task.id).projectId).toBe(destination.id)
@@ -172,10 +174,11 @@ describe('SQLite persistence and domain invariants', () => {
     const a = tasks.create({ title: 'A', projectId }),
       b = tasks.create({ title: 'B', projectId }),
       c = tasks.create({ title: 'C', projectId })
-    expect(tasks.reorder([c.id, a.id]).map((t) => t.title)).toEqual(['C', 'B', 'A'])
-    expect(tasks.get(b.id).order).toBe(1)
-    expect(() => tasks.reorder([a.id, 'missing'])).toThrow()
     expect(tasks.list().map((t) => t.title)).toEqual(['C', 'B', 'A'])
+    expect(tasks.reorder([a.id, c.id]).map((t) => t.title)).toEqual(['A', 'B', 'C'])
+    expect(tasks.get(b.id).order).toBe(1)
+    expect(() => tasks.reorder([c.id, 'missing'])).toThrow()
+    expect(tasks.list().map((t) => t.title)).toEqual(['A', 'B', 'C'])
   })
   it('validates real calendar dates, strict IPC fields, and nonempty capture', () => {
     expect(isCalendarDate('2028-02-29')).toBe(true)

@@ -89,7 +89,7 @@ async function launch() {
     win.webContents.setBackgroundThrottling(false)
     win.showInactive()
   })
-  await page.getByRole('heading', { name: 'Today Plan', exact: true }).waitFor()
+  await page.getByRole('heading', { name: '今日计划', exact: true }).waitFor()
 }
 const nav = (name) =>
   page
@@ -199,7 +199,7 @@ try {
             get(await window.workbench.completeTask(task.id, true))
         }
       }
-      get(
+      const futureTask = get(
         await window.workbench.createTask({
           title: '明天才开始的任务',
           projectId: projects[0].id,
@@ -207,22 +207,27 @@ try {
         })
       )
       get(await window.workbench.setAssistantRecognitionEnabled(false))
-      return { projects, tasks }
+      return { projects, tasks, futureTask }
     },
     { today, tomorrow }
   )
   await page.reload()
+  await page.getByRole('heading', { name: '今日计划', exact: true }).waitFor()
+  assert.equal(await page.locator('.plan-note').count(), 0)
+  assert.equal(await page.getByTestId('task-row').count(), seed.tasks.length)
+  await view('全部任务')
+  await page.getByRole('button', { name: '项目卡片' }).click()
   await page.locator('.plan-note').nth(7).waitFor()
   assert.equal(await page.locator('.plan-note').count(), 8)
   assert.equal(await page.getByRole('button', { name: '全部项目', exact: true }).count(), 0)
   assert.equal(await page.locator('.project-nav').count(), 0)
-  const noteColors = await page
-    .locator('.plan-note')
-    .evaluateAll((notes) => notes.map((note) => getComputedStyle(note).backgroundColor))
-  assert.equal(new Set(noteColors).size, noteColors.length, JSON.stringify(noteColors))
+  const noteColors = await page.locator('.plan-note').evaluateAll((notes) => notes.map((note) => ({ edge: getComputedStyle(note).borderLeftColor, avatar: getComputedStyle(note.querySelector('.plan-note-avatar')).color })))
+  assert.ok(noteColors.every(({ avatar }) => avatar !== 'rgba(0, 0, 0, 0)' && avatar !== 'transparent'), JSON.stringify(noteColors))
+  await page.getByText('更多选项', { exact: false }).first().click()
   assert.equal(await page.getByRole('button', { name: '新建项目', exact: true }).count(), 1)
-  assert.equal(await page.getByTestId('task-row').count(), seed.tasks.length)
-  assert.equal(await page.getByText('明天才开始的任务', { exact: true }).count(), 0)
+  await page.getByText('更多选项', { exact: false }).first().click()
+  assert.equal(await page.getByTestId('task-row').count(), seed.tasks.length + 1)
+  assert.equal(await page.getByText('明天才开始的任务', { exact: true }).count(), 1)
   await geometry('notes-light')
   await capture('01-notes-light')
   await page.getByRole('checkbox', { name: `完成 ${seed.tasks[0].title}`, exact: true }).click()
@@ -233,7 +238,7 @@ try {
       .filter({ hasText: '论文写作' })
       .locator('.plan-note-count')
       .innerText(),
-    '2 / 3'
+    '已完成 2 / 4'
   )
   await page.getByRole('checkbox', { name: `恢复 ${seed.tasks[0].title}`, exact: true }).click()
   await page.getByRole('button', { name: '添加任务到 光谱融合', exact: true }).click()
@@ -255,7 +260,8 @@ try {
   const stored = unwrap(await page.evaluate(() => window.workbench.bootstrap()))
   const newTask = stored.tasks.find((t) => t.title === '便签加号创建的任务')
   assert.equal(newTask.projectId, seed.projects[1].id)
-  assert.equal(newTask.scheduledDate, today)
+  assert.equal(newTask.scheduledDate, null)
+  await page.getByText('更多选项', { exact: false }).first().click()
   await page.getByRole('button', { name: '新建项目', exact: true }).click()
   await page.getByRole('dialog').getByLabel('项目名称', { exact: true }).fill('新建课题')
   await page.getByRole('dialog').getByRole('button', { name: '创建项目', exact: true }).click()
@@ -276,21 +282,41 @@ try {
   await page.getByLabel('筛选任务', { exact: true }).fill('光谱不存在')
   assert.equal(await page.locator('.plan-note').count(), 0)
   await page.getByLabel('筛选任务', { exact: true }).fill('')
+  await view('今日计划')
   await page.getByRole('button', { name: '时间安排', exact: true }).click()
   await page.getByTestId('schedule-block').filter({ hasText: '准备本周组会提纲' }).waitFor()
-  await page.getByRole('button', { name: '便签', exact: true }).click()
   await view('全部任务')
-  await page.getByText('明天才开始的任务', { exact: true }).waitFor()
+  await page.getByText(seed.futureTask.title, { exact: true }).waitFor()
+  const overflowingNoteList = await page
+    .locator('.plan-note')
+    .filter({ hasText: '论文写作' })
+    .locator('.task-list')
+    .evaluate((element) => {
+      const rows = [...element.querySelectorAll('.task-row')]
+      const firstRow = rows[0].getBoundingClientRect()
+      const styles = getComputedStyle(element)
+      const gap = Number.parseFloat(styles.rowGap || styles.gap || '0')
+      return {
+        rows: rows.length,
+        clientHeight: element.clientHeight,
+        scrollHeight: element.scrollHeight,
+        threeRowHeight: firstRow.height * 3 + gap * 2
+      }
+    })
+  assert.equal(overflowingNoteList.rows, 4)
+  assert.ok(overflowingNoteList.scrollHeight <= overflowingNoteList.clientHeight + 2)
+  assert.ok(overflowingNoteList.clientHeight > overflowingNoteList.threeRowHeight)
   await page.getByLabel('任务完成状态', { exact: true }).selectOption('completed')
   assert.equal(await page.getByTestId('task-row').count(), 3)
   await page.getByLabel('任务完成状态', { exact: true }).selectOption('all')
+  await page.getByLabel('项目卡片内的任务排序').selectOption('manual')
   // The existing keyboard sorting must reorder within one project without losing other tasks.
-  const a = page.getByRole('button', { name: `调整顺序 ${seed.tasks[0].title}`, exact: true })
+  const a = page.getByRole('button', { name: `调整顺序 ${seed.tasks[2].title}`, exact: true })
   await a.focus()
   await page.keyboard.press('Space')
   await page.locator('.task-row.dragging').waitFor()
   await page.keyboard.press('ArrowDown')
-  await page.waitForFunction(() => document.body.textContent.includes('移动到第2项。'))
+  await page.waitForFunction(() => document.body.textContent.includes('移动到第3项。'))
   await page.keyboard.press('Space')
   await waitForAsync(
     page,
@@ -299,15 +325,15 @@ try {
       return (
         r.ok &&
         r.data.tasks.find((t) => t.id === first).order >
-          r.data.tasks.find((t) => t.id === second).order
+        r.data.tasks.find((t) => t.id === second).order
       )
     },
-    { first: seed.tasks[0].id, second: seed.tasks[1].id }
+    { first: seed.tasks[2].id, second: seed.tasks[1].id }
   )
   pass(
     'Project notes: correct date scope, completion/restore, project-targeted input, inspector, search, status filter, keyboard reorder and original schedule'
   )
-  await view('Today Plan')
+  await view('全部任务')
   await page.getByRole('button', { name: '深色模式' }).click()
   await capture('02-notes-dark')
   const noteSurface = await page.locator('.plan-note').first().evaluate((element) => ({ image: getComputedStyle(element).backgroundImage, before: getComputedStyle(element, '::before').content }))
@@ -365,6 +391,7 @@ try {
   await nav('科研成果')
   await page.getByTestId('publication-book').nth(13).waitFor()
   assert.equal(await page.getByTestId('publication-list-row').count(), 14)
+  assert.deepEqual(await page.getByRole('table', { name: '科研成果列表' }).getByRole('columnheader').allTextContents(), ['序号', '论文名称', '期刊等级', '发表年份'])
   assert.equal(
     await page.getByRole('table', { name: '科研成果列表' }).getByRole('checkbox').count(),
     0

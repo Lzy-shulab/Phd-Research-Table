@@ -209,6 +209,11 @@
 }
 .plan-note .task-list {
   gap: 8px;
+  max-height: calc(52px * 3 + 8px * 2);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 3px;
+  scrollbar-gutter: stable;
 }
 .plan-note .task-row {
   background: transparent;
@@ -425,6 +430,7 @@
   perspective: 1200px;
   background: radial-gradient(ellipse at 50% 100%, #94734e0b, transparent 72%);
 }
+.book-arrival { display: flex; align-items: flex-end; flex: 0 0 auto; }
 .publication-book {
   position: relative;
   display: flex;
@@ -575,13 +581,11 @@
 }
 .publication-table-header,
 .publication-table-row {
-  min-width: 910px;
+  min-width: 720px;
   display: grid;
-  grid-template-columns:
-    minmax(280px, 2.2fr) minmax(150px, 1.05fr) 105px minmax(170px, 1.25fr)
-    72px 72px;
+  grid-template-columns: 58px minmax(360px, 1fr) minmax(150px, 0.34fr) 100px;
   align-items: center;
-  column-gap: 18px;
+  column-gap: 16px;
 }
 .publication-table-header {
   min-height: 40px;
@@ -611,6 +615,11 @@
   gap: 11px;
   color: var(--text-primary);
 }
+.publication-list-index {
+  color: var(--text-muted);
+  font-size: 0.73rem;
+  font-variant-numeric: tabular-nums;
+}
 .publication-list-title button {
   min-width: 0;
   overflow: hidden;
@@ -631,32 +640,9 @@
   background: var(--book-cloth);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--book-cloth) 13%, transparent);
 }
-.publication-list-authors,
-.publication-list-journal {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.publication-list-partition {
+.publication-list-grade {
   color: var(--accent);
-}
-.publication-list-actions {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-}
-.publication-list-actions button {
-  width: 29px;
-  height: 29px;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  color: var(--text-muted);
-}
-.publication-list-actions button:hover {
-  color: var(--accent);
-  background: var(--accent-soft);
+  font-weight: 540;
 }
 .book-detail-overlay {
   position: fixed;
@@ -697,7 +683,7 @@
   background: var(--surface-solid);
   color: var(--text-primary);
   perspective: 1800px;
-  overflow: hidden;
+  overflow: visible;
   z-index: 21;
 }
 .book-detail::after {
@@ -727,7 +713,7 @@
   box-shadow: inset 5px 0 12px #0003, 0 4px 12px #0002;
   pointer-events: none;
 }
-.book-opening-cover strong { font: 600 1.8rem/1.5 Georgia, 'Noto Serif SC', serif; }
+.book-opening-cover strong { font: 600 1.8rem/1.5 Georgia, 'Noto Serif SC', serif; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 8; overflow: hidden; }
 .book-opening-cover > span { font-size: 0.78rem; letter-spacing: 0.06em; }
 .book-detail:focus {
   outline: none;
@@ -737,6 +723,8 @@
   pointer-events: none;
 }
 .book-detail-preview {
+  overflow: hidden;
+  border-radius: 8px 0 0 8px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -798,6 +786,8 @@
   font-size: 0.72rem;
 }
 .book-detail-information {
+  overflow: hidden;
+  border-radius: 0 12px 12px 0;
   display: flex;
   flex-direction: column;
   min-width: 0;

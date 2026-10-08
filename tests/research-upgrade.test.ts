@@ -41,7 +41,7 @@ describe('Research workspace upgrade', () => {
       expect(new LibraryRepository(upgraded.db).papers()[0]?.honors).toEqual([])
       expect(upgraded.sqlite.prepare('SELECT * FROM submissions').all()).toEqual([])
       expect(upgraded.sqlite.prepare('SELECT * FROM submission_stages').all()).toEqual([])
-      expect(upgraded.sqlite.prepare('SELECT * FROM __drizzle_migrations').all()).toHaveLength(6)
+      expect(upgraded.sqlite.prepare('SELECT * FROM __drizzle_migrations').all()).toHaveLength(8)
     } finally { upgraded.close(); rmSync(directory, { recursive: true, force: true }) }
   })
   it('backfills legacy submission events into editable custom stages without changing old rows', () => {
@@ -64,7 +64,8 @@ describe('Research workspace upgrade', () => {
     } finally { old.close() }
     const upgraded = openDatabase(path, resolve('src/main/database/migrations'))
     try {
-      expect(upgraded.sqlite.prepare('SELECT * FROM submissions').all()).toEqual(submissionsBefore)
+      expect(upgraded.sqlite.prepare('SELECT * FROM submissions').all()).toHaveLength(submissionsBefore.length)
+      expect(upgraded.sqlite.prepare('SELECT * FROM submissions').all()[0]).toMatchObject(submissionsBefore[0] as object)
       expect(upgraded.sqlite.prepare('SELECT * FROM submission_events ORDER BY occurred_at').all()).toEqual(eventsBefore)
       expect(upgraded.sqlite.prepare('SELECT name,occurred_on,position FROM submission_stages ORDER BY position').all()).toEqual([
         { name: '已投稿', occurred_on: '2026-08-28', position: 0 },

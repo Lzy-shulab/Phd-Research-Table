@@ -40,6 +40,7 @@ export function MiniCalendar({ value, onSelect }: { value?: string; onSelect?: (
           </Button>
         </div>
       </div>
+      {!onSelect && <p className="mini-calendar-hint">选日期，在日历中查看当天安排</p>}
       <div className="mini-calendar-grid">
         {['一', '二', '三', '四', '五', '六', '日'].map((day, i) => (
           <span key={i} className="weekday">
@@ -52,10 +53,10 @@ export function MiniCalendar({ value, onSelect }: { value?: string; onSelect?: (
           return (
             <button
               key={key}
-              title={formatDate(date)}
+              title={onSelect ? formatDate(date) : `在日历中查看 ${formatDate(date)}`}
               aria-label={formatDate(date, 'yyyy年M月d日')}
               aria-current={key === dateKey(now) ? 'date' : undefined}
-              onClick={() => onSelect ? onSelect(key) : setCalendar(key)}
+              onClick={() => onSelect ? onSelect(key) : setCalendar(key, 'day')}
               className={cn(
                 'mini-day',
                 !isSameMonth(date, month) && 'outside',

@@ -29,7 +29,7 @@ async function launch() {
   page = await app.firstWindow()
   await app.evaluate(({ BrowserWindow }) => { const window = BrowserWindow.getAllWindows()[0]; window.hide(); window.setBounds({ width: 1440, height: 950 }) })
   page.on('pageerror', (error) => errors.push(error.message))
-  await page.getByRole('heading', { name: 'Today Plan', exact: true }).waitFor()
+  await page.getByRole('heading', { name: '今日计划', exact: true }).waitFor()
   assert.equal(await app.evaluate(({ app }) => app.getPath('userData')), profile)
 }
 async function layout(name, selectors) {
@@ -53,7 +53,7 @@ async function makePublication(path, title, partition) {
   await page.getByRole('button', { name: '添加成果', exact: true }).click()
   const dialog = page.getByRole('dialog')
   await pick(path)
-  await dialog.getByRole('button', { name: '选择 PDF', exact: true }).click()
+  await dialog.getByRole('button', { name: /选择 PDF/ }).click()
   await dialog.getByLabel('成果标题', { exact: true }).fill(title)
   await dialog.getByLabel('作者', { exact: true }).fill('测试作者')
   await dialog.getByLabel('期刊 / 会议', { exact: true }).fill('期刊分区验收')
@@ -85,14 +85,16 @@ try {
     }
   }, paths.slice(0, 5))
   await page.reload()
-  await page.getByRole('heading', { name: 'Today Plan', exact: true }).waitFor()
+  await page.getByRole('heading', { name: '今日计划', exact: true }).waitFor()
   await nav('科研成果')
   await makePublication(paths[5], '原有分区保留验证', '1区')
   await makePublication(paths[6], '新增期刊类型验证', 'EI')
-  assert.equal(await page.getByText('期刊分区 EI', { exact: true }).count(), 1)
+  assert.equal(await page.locator('.publication-list-grade').filter({ hasText: /EI/ }).count(), 1)
+  assert.deepEqual(await page.getByRole('table', { name: '科研成果列表' }).getByRole('columnheader').allTextContents(), ['序号', '论文名称', '期刊等级', '发表年份'])
   const publicationBefore = (await library()).papers.find((paper) => paper.title === '新增期刊类型验证')
   for (const value of ['中文核心', '大学学报']) {
-    await page.getByRole('button', { name: '编辑成果 新增期刊类型验证', exact: true }).click()
+    await page.getByRole('button', { name: '抽出论文 新增期刊类型验证', exact: true }).click()
+    await page.getByRole('button', { name: '编辑发表信息', exact: true }).click()
     await page.getByLabel('期刊分区', { exact: true }).selectOption(value)
     await page.getByRole('button', { name: '保存成果', exact: true }).click()
     await page.getByRole('dialog').waitFor({ state: 'hidden' })
@@ -106,7 +108,7 @@ try {
   const storageBefore = await storage(), sourceHashes = paths.map(hash)
   await nav('设置')
   assert.equal((await preferences()).preferences.fontSize, 14)
-  for (const [value, label] of [['mist', '晨雾'], ['sage', '青绿'], ['dusk', '暮色'], ['default', '默认']]) {
+  for (const [value, label] of [['mist', '晨雾'], ['sage', '青绿'], ['dusk', '暮色'], ['midnight', '极夜黑'], ['klein', '克莱因蓝'], ['default', '默认']]) {
     await page.getByRole('button', { name: `${label}背景`, exact: true }).click()
     await page.waitForFunction((value) => document.documentElement.dataset.background === value, value)
     await waitForAsync(page, async (value) => { const r = await window.workbench.interfacePreferences(); return r.ok && r.data.preferences.background === value }, value)
@@ -115,7 +117,7 @@ try {
   await page.getByRole('group', { name: '显示模式' }).getByRole('button', { name: '深色', exact: true }).click()
   await page.waitForFunction(() => document.documentElement.dataset.theme === 'dark')
   await capture('settings-dark-18')
-  check('Four built-in backgrounds, all four text sizes and light/dark appearance apply and persist immediately')
+  check('Six built-in backgrounds, all four text sizes and light/dark appearance apply and persist immediately')
 
   const images = await page.evaluate(() => {
     const canvas = document.createElement('canvas'); canvas.width = 1600; canvas.height = 1000
@@ -165,7 +167,8 @@ try {
   await nav('科研成果')
   await layout('outputs-18', ['.main-region', '.publication-grid', '.publication-card'])
   await capture('outputs-minimum-light-18')
-  await page.getByRole('button', { name: '编辑成果 新增期刊类型验证', exact: true }).click()
+  await page.getByRole('button', { name: '抽出论文 新增期刊类型验证', exact: true }).click()
+  await page.getByRole('button', { name: '编辑发表信息', exact: true }).click()
   assert.equal(await page.getByLabel('期刊分区', { exact: true }).inputValue(), '大学学报')
   await page.getByLabel('期刊分区', { exact: true }).scrollIntoViewIfNeeded()
   await layout('publication-dialog-18', ['.publication-dialog', '.publication-dialog form'])

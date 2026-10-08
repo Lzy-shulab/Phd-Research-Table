@@ -27,7 +27,7 @@ async function launch() {
   page = await app.firstWindow()
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].hide())
   page.on('pageerror', (error) => errors.push(error.message))
-  await page.getByRole('heading', { name: 'Today Plan', exact: true }).waitFor()
+  await page.getByRole('heading', { name: '今日计划', exact: true }).waitFor()
 }
 async function snapshot() {
   const result = await page.evaluate(() => window.workbench.bootstrap())
@@ -58,7 +58,7 @@ async function capture(title) {
   const projectId = state.projects.find((project) => !project.archivedAt)?.id
   assert.ok(projectId)
   const context = await page.locator('.workspace-header h1').innerText()
-  const scheduledDate = context === 'Today Plan' ? today : undefined
+  const scheduledDate = context === '今日计划' ? today : undefined
   const created = await page.evaluate((input) => window.workbench.createTask(input), {
     title,
     projectId,
@@ -66,9 +66,9 @@ async function capture(title) {
   })
   assert.equal(created.ok, true, JSON.stringify(created))
   await page.reload()
-  await page.getByRole('heading', { name: 'Today Plan', exact: true }).waitFor()
+  await page.getByRole('heading', { name: '今日计划', exact: true }).waitFor()
   if (context === '全部任务') await nav('全部任务')
-  else if (context !== 'Today Plan') await nav('全部任务')
+  else if (context !== '今日计划') await nav('全部任务')
   return await saved(title, {})
 }
 async function edit(title) {
@@ -101,14 +101,15 @@ try {
   check('Clean first launch on Today; sandboxed renderer and typed preload')
   await screenshot('01-empty.png')
 
-  await page.getByRole('button', { name: '新建项目', exact: true }).last().click()
+  await page.getByText('更多选项', { exact: false }).first().click()
+  await page.getByRole('button', { name: '新建项目', exact: true }).click()
   await page.getByRole('textbox', { name: '项目名称' }).fill('PhD Thesis')
   await page
     .getByRole('textbox', { name: '描述', exact: true })
     .fill('A rigorous research direction.')
   await page.getByRole('button', { name: '鼠尾草绿项目颜色' }).click()
   await page.getByRole('button', { name: '创建项目', exact: true }).click()
-  await page.locator('.plan-note').filter({ hasText: 'PhD Thesis' }).waitFor()
+  assert.equal(await page.locator('.today-other-projects').count(), 0)
   const projectId = (await snapshot()).projects[0].id
   const task = await capture('Read papers about spectral reconstruction')
   assert.equal(task.projectId, projectId)
@@ -150,7 +151,7 @@ try {
   await saved('Read three HSI papers', { projectId })
   await closeInspector()
 
-  await nav('Today Plan')
+  await nav('今日计划')
   await page.getByRole('button', { name: '时间安排', exact: true }).click()
   await page.getByTestId('schedule-block').filter({ hasText: 'Read three HSI papers' }).waitFor()
   await capture('Prepare supervisor meeting')
@@ -168,7 +169,7 @@ try {
   await page.getByLabel('任务排序', { exact: true }).selectOption('priority')
   assert.match(await page.getByTestId('task-row').first().innerText(), /Read three HSI papers/)
   await page.getByLabel('任务排序', { exact: true }).selectOption('manual')
-  check('Today Plan, future work in All Tasks, unscheduled legacy tasks and sorting')
+  check('今日计划, future work in All Tasks, unscheduled legacy tasks and sorting')
 
   await page.getByRole('checkbox', { name: '完成 Read three HSI papers', exact: true }).click()
   await saved('Read three HSI papers', { status: 'completed' })
@@ -272,7 +273,8 @@ try {
   await page.getByRole('button', { name: '归档项目', exact: true }).click()
   await page.getByRole('button', { name: '管理项目 Thesis Research', exact: true }).click()
   await page.getByRole('button', { name: '恢复项目', exact: true }).click()
-  await page.getByRole('button', { name: '新建项目', exact: true }).last().click()
+  await page.getByText('更多选项', { exact: false }).first().click()
+  await page.getByRole('button', { name: '新建项目', exact: true }).click()
   await page.getByRole('textbox', { name: '项目名称' }).fill('Research continuation')
   await page.getByRole('button', { name: '创建项目', exact: true }).click()
   const receivingId = (await snapshot()).projects.find((p) => p.name === 'Research continuation').id
@@ -310,7 +312,11 @@ try {
     true
   )
   await page.keyboard.press('Control+k')
-  await page.getByText(/命令面板尚未开放/).waitFor()
+  const globalSearch = page.getByRole('dialog', { name: '全局搜索' })
+  await globalSearch.waitFor()
+  await globalSearch.getByLabel('全局搜索').fill('Read three HSI papers')
+  await globalSearch.getByRole('option').filter({ hasText: 'Read three HSI papers' }).waitFor()
+  await page.keyboard.press('Escape')
   check('Contextual module navigation and keyboard shortcuts')
 
   await nav('全部任务')

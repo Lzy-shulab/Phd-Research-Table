@@ -42,7 +42,7 @@ async function launch() {
   page = await app.firstWindow()
   await app.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows()[0].hide() })
   page.on('pageerror', (error) => errors.push(error.message))
-  await page.getByRole('heading', { name: 'Today Plan', exact: true }).waitFor()
+  await page.getByRole('heading', { name: '今日计划', exact: true }).waitFor()
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.clock.setFixedTime(new Date(firstDate))
   await app.evaluate(({ session }, { fixturePool, live, firstDate }) => {
@@ -58,7 +58,7 @@ async function launch() {
     else session.fromPartition('workbench-research').webRequest.onBeforeRequest((details, callback) => { globalThis.__quoteRequests.push(details.url); callback({}) })
     process.env.WORKBENCH_DISABLE_ENCOURAGEMENT_AUTO = '0'
   }, { fixturePool, live, firstDate })
-  await page.reload(); await page.getByRole('heading', { name: 'Today Plan', exact: true }).waitFor()
+  await page.reload(); await page.getByRole('heading', { name: '今日计划', exact: true }).waitFor()
 }
 try {
   await launch()

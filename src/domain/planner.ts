@@ -1,7 +1,27 @@
 import { format, parseISO } from 'date-fns'
 import type { PlannerView, Task } from '../shared/types'
-export type TaskSort = 'manual' | 'scheduled' | 'priority' | 'title' | 'updated'
+export type TaskSort = 'focus' | 'manual' | 'scheduled' | 'priority' | 'title' | 'updated'
 const priorityWeight = { high: 3, medium: 2, low: 1, none: 0 }
+const actionDate = (task: Task) => {
+  const planned = [task.scheduledDate, task.dueDate].filter((date): date is string => !!date).sort()[0] ?? '9999-12-31'
+  return task.deferredUntil && task.deferredUntil > planned ? task.deferredUntil : planned
+}
+export function isOverdueTask(task: Task, today: string) {
+  if (task.status === 'completed' || (task.deferredUntil && task.deferredUntil > today)) return false
+  return (!!task.scheduledDate && task.scheduledDate < today) || (!!task.dueDate && task.dueDate < today)
+}
+export function todayPlan(tasks: Task[], today: string) {
+  const scheduled = tasks.filter((task) => task.scheduledDate === today)
+  const dueOnly = tasks.filter((task) => task.dueDate === today && task.scheduledDate !== today)
+  const completed = [...scheduled, ...dueOnly].filter((task) => task.status === 'completed')
+  const overdue = tasks.filter((task) => isOverdueTask(task, today) && task.scheduledDate !== today && task.dueDate !== today)
+  return {
+    scheduled: scheduled.filter((task) => task.status !== 'completed'),
+    dueOnly: dueOnly.filter((task) => task.status !== 'completed'),
+    completed,
+    overdue
+  }
+}
 export function selectTasks(
   tasks: Task[],
   view: PlannerView,
@@ -14,7 +34,7 @@ export function selectTasks(
     if (view === 'completed') return task.status === 'completed'
     if (task.status === 'completed') return false
     if (view === 'inbox') return !task.scheduledDate
-    if (view === 'today') return task.scheduledDate === today || (!task.scheduledDate && task.dueDate === today)
+    if (view === 'today') return isOverdueTask(task, today) || task.scheduledDate === today || task.dueDate === today
     if (view === 'upcoming') return !!task.scheduledDate && task.scheduledDate > today
     if (view === 'project') return task.projectId === projectId
     return true
@@ -22,6 +42,13 @@ export function selectTasks(
 }
 export function sortTasks(tasks: Task[], sort: TaskSort): Task[] {
   return [...tasks].sort((a, b) => {
+    if (sort === 'focus')
+      return Number(a.status === 'completed') - Number(b.status === 'completed') ||
+        (a.status === 'completed' ? (b.completedAt ?? '').localeCompare(a.completedAt ?? '') :
+          actionDate(a).localeCompare(actionDate(b)) ||
+          priorityWeight[b.priority] - priorityWeight[a.priority] ||
+          (a.startTime ?? '99:99').localeCompare(b.startTime ?? '99:99') ||
+          a.order - b.order)
     if (sort === 'priority')
       return priorityWeight[b.priority] - priorityWeight[a.priority] || a.order - b.order
     if (sort === 'title') return a.title.localeCompare(b.title)

@@ -83,6 +83,14 @@ gemini = false
 siliconflow = true
 openaicompatible = false
 
+[translation]
+qps = 4
+pool_max_workers = "null"
+term_qps = "null"
+term_pool_max_workers = "null"
+save_auto_extracted_glossary = true
+no_auto_extract_glossary = false
+
 [siliconflowfree_detail]
 translate_engine_type = "SiliconFlowFree"
 
@@ -106,12 +114,18 @@ openai_compatible_api_key = "old-compatible-secret"
     expect(output).toContain('openaicompatible = true')
     expect(output).toContain('siliconflow = false')
     expect(output).toContain('openai_compatible_model = "openrouter/free"')
-    expect(output).toContain('openai_compatible_base_url = "https://openrouter.ai/api/v1"')
-    expect(output).toContain('openai_compatible_api_key = "selected-key"')
-    expect(output).not.toContain('old-secret')
-    expect(output).not.toContain('old-gemini-secret')
-    expect(output).not.toContain('old-compatible-secret')
-  })
+      expect(output).toContain('openai_compatible_base_url = "https://openrouter.ai/api/v1"')
+      expect(output).toContain('openai_compatible_api_key = "selected-key"')
+      expect(output).not.toContain('old-secret')
+      expect(output).not.toContain('old-gemini-secret')
+      expect(output).not.toContain('old-compatible-secret')
+      expect(output).toMatch(/^qps = 20$/m)
+      expect(output).toMatch(/^pool_max_workers = 100$/m)
+      expect(output).toMatch(/^term_qps = 20$/m)
+      expect(output).toMatch(/^term_pool_max_workers = 100$/m)
+      expect(output).toMatch(/^save_auto_extracted_glossary = false$/m)
+      expect(output).toMatch(/^no_auto_extract_glossary = true$/m)
+    })
 
   it('applies every built-in provider safely to the bundled 2.9.0 configuration schema', () => {
     const bundled = readFileSync(resolve('resources/pdf2zh-config.toml.example'), 'utf8')
@@ -135,6 +149,23 @@ openai_compatible_api_key = "old-compatible-secret"
     expect(output).toContain('siliconflowfree = true')
     expect(output).toContain('gemini = false')
     expect(output).not.toMatch(/api_key\s*=\s*"(?!null)/)
+  })
+
+  it('sends the non-thinking switch for Qwen3 hybrid translation while keeping cache enabled', () => {
+    const inherited = template.replace('qps = 4', 'qps = 4\nignore_cache = true') + '\n'
+    const output = applyTranslationProfileConfig(inherited, { id: 'siliconflow-api', name: 'SiliconFlow', provider: 'siliconflow', model: 'Qwen/Qwen3-8B', baseUrl: 'https://api.siliconflow.cn/v1', apiKey: 'selected-key' })
+    expect(output).toMatch(/^siliconflow_enable_thinking = false$/m)
+    expect(output).toMatch(/^siliconflow_send_enable_thinking_param = true$/m)
+    expect(output).toMatch(/^ignore_cache = false$/m)
+    expect(output).toMatch(/^no_auto_extract_glossary = true$/m)
+    expect(inherited).not.toContain('siliconflow_send_enable_thinking_param')
+  })
+
+  it('does not send a Qwen3-only API parameter to unrelated or thinking-only models', () => {
+    for (const model of ['custom-model', 'Qwen/Qwen3-235B-A22B-Thinking-2507', 'deepseek-ai/DeepSeek-V3']) {
+      const output = applyTranslationProfileConfig(template, { id: 'siliconflow-api', name: 'SiliconFlow', provider: 'siliconflow', model, baseUrl: 'https://api.siliconflow.cn/v1', apiKey: 'selected-key' })
+      expect(output).toMatch(/^siliconflow_send_enable_thinking_param = false$/m)
+    }
   })
 
   it('writes the current Gemini Flash-Lite model into the Gemini section only', () => {

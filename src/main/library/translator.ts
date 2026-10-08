@@ -4,6 +4,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { app } from 'electron'
 import type { TranslationRuntimeProfile } from '../../shared/translation'
+import { isHybridQwen3 } from '../../shared/translation'
 import { EngineProgressDecoder, type EngineProgress } from './translation-progress'
 
 const engineFlags = [
@@ -16,17 +17,35 @@ function tomlString(value: string) {
   return JSON.stringify(value)
 }
 
-function setTomlField(source: string, section: string, key: string, value: string) {
+const WORKBENCH_TRANSLATION_QPS = 20
+const WORKBENCH_TRANSLATION_POOL_MAX_WORKERS = 100
+
+function setTomlRawField(source: string, section: string, key: string, value: string) {
   const lines = source.split(/\r?\n/)
   const sectionIndex = lines.findIndex((line) => line.trim() === `[${section}]`)
   if (sectionIndex < 0) throw new Error(`翻译引擎配置缺少 [${section}]。`)
   const nextSection = lines.findIndex((line, index) => index > sectionIndex && /^\s*\[[^\]]+\]\s*$/.test(line))
   const end = nextSection < 0 ? lines.length : nextSection
   const fieldIndex = lines.findIndex((line, index) => index > sectionIndex && index < end && new RegExp(`^\\s*${key}\\s*=`).test(line))
-  const replacement = `${key} = ${tomlString(value)}`
+  const replacement = `${key} = ${value}`
   if (fieldIndex >= 0) lines[fieldIndex] = replacement
   else lines.splice(end, 0, replacement)
   return lines.join('\n')
+}
+
+function setTomlField(source: string, section: string, key: string, value: string) {
+  return setTomlRawField(source, section, key, tomlString(value))
+}
+
+function applyWorkbenchTranslationDefaults(source: string) {
+  let configured = setTomlRawField(source, 'translation', 'qps', String(WORKBENCH_TRANSLATION_QPS))
+  configured = setTomlRawField(configured, 'translation', 'pool_max_workers', String(WORKBENCH_TRANSLATION_POOL_MAX_WORKERS))
+  configured = setTomlRawField(configured, 'translation', 'term_qps', String(WORKBENCH_TRANSLATION_QPS))
+  configured = setTomlRawField(configured, 'translation', 'term_pool_max_workers', String(WORKBENCH_TRANSLATION_POOL_MAX_WORKERS))
+  configured = setTomlRawField(configured, 'translation', 'save_auto_extracted_glossary', 'false')
+  configured = setTomlRawField(configured, 'translation', 'no_auto_extract_glossary', 'true')
+  configured = setTomlRawField(configured, 'translation', 'ignore_cache', 'false')
+  return configured
 }
 
 export function applyTranslationProfileConfig(template: string, profile: TranslationRuntimeProfile) {
@@ -52,12 +71,17 @@ export function applyTranslationProfileConfig(template: string, profile: Transla
     configured = setTomlField(configured, 'siliconflow_detail', 'siliconflow_base_url', profile.baseUrl)
     configured = setTomlField(configured, 'siliconflow_detail', 'siliconflow_model', profile.model)
     configured = setTomlField(configured, 'siliconflow_detail', 'siliconflow_api_key', profile.apiKey)
+    // Qwen3 hybrid models otherwise use server-side thinking defaults. The engine
+    // only sends enable_thinking when the separate send flag is enabled.
+    const hybridQwen = isHybridQwen3(profile.model)
+    configured = setTomlRawField(configured, 'siliconflow_detail', 'siliconflow_enable_thinking', 'false')
+    configured = setTomlRawField(configured, 'siliconflow_detail', 'siliconflow_send_enable_thinking_param', String(hybridQwen))
   } else if (profile.provider === 'openai-compatible') {
     configured = setTomlField(configured, 'openaicompatible_detail', 'openai_compatible_base_url', profile.baseUrl)
     configured = setTomlField(configured, 'openaicompatible_detail', 'openai_compatible_model', profile.model)
     configured = setTomlField(configured, 'openaicompatible_detail', 'openai_compatible_api_key', profile.apiKey)
   }
-  return configured
+  return applyWorkbenchTranslationDefaults(configured)
 }
 
 export function translatorExecutable(directory: string) {
@@ -100,7 +124,7 @@ export async function runTranslation(directory: string, source: string, output: 
   const configured = applyTranslationProfileConfig(await readFile(template, 'utf8'), profile)
   await writeFile(config, configured, { encoding: 'utf8', flag: 'wx' })
   // Select the translation service and model from the per-job profile configuration.
-  const args = [source, '--qps', '8', '--output', output, '--lang-in', 'en', '--lang-out', 'zh-CN',
+  const args = [source, '--output', output, '--lang-in', 'en', '--lang-out', 'zh-CN',
     '--config-file', config, '--watermark-output-mode', 'no_watermark', '--no-mono']
   const python = join(directory, 'zotero-pdf2zh-next-venv', 'Scripts', 'python.exe')
   const adapter = app.isPackaged ? join(process.resourcesPath, 'translation-progress.py') : join(app.getAppPath(), 'resources', 'translation-progress.py')

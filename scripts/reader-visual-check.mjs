@@ -15,7 +15,7 @@ try {
   const errors = []
   page.on('pageerror', error => errors.push(error.message))
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].hide())
-  await page.getByRole('heading', { name: 'Today Plan', exact: true }).waitFor()
+  await page.getByRole('heading', { name: '今日计划', exact: true }).waitFor()
   await page.getByRole('navigation', { name: '科研工作空间' }).getByRole('button', { name: '文献阅读' }).click()
   await page.getByRole('button', { name: '翻译', exact: true }).click()
   await page.waitForFunction(() => /[\u4e00-\u9fff]/.test(document.querySelector('.textLayer')?.textContent ?? ''))

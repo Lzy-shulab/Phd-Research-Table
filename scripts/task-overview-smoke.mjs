@@ -105,7 +105,7 @@ async function launch() {
     win.webContents.setBackgroundThrottling(false)
     win.showInactive()
   })
-  await page.getByRole('heading', { name: 'Today Plan', exact: true }).waitFor()
+  await page.getByRole('heading', { name: '今日计划', exact: true }).waitFor()
 }
 const nav = (name) =>
   page
@@ -229,6 +229,7 @@ try {
             model: 'controlled-fixture'
           })
         )
+        get(await window.workbench.setAssistantRecognitionEnabled(true))
         get(
           await window.workbench.createSubmission({
             title: 'Synthetic research submission for interface verification',
@@ -259,7 +260,7 @@ try {
     )
   )
   await page.reload()
-  await page.getByRole('heading', { name: 'Today Plan', exact: true }).waitFor()
+  await page.getByRole('heading', { name: '今日计划', exact: true }).waitFor()
   assert.equal(
     await page
       .locator('.planner-nav .sidebar-link')
@@ -270,15 +271,16 @@ try {
   )
   await globalView('全部任务')
   assert.equal(await page.locator('.task-row').count(), 5)
+  await page.getByRole('button', { name: '项目卡片' }).click()
   assert.equal(await page.locator('.plan-note').count(), 2)
   assert.equal(await page.getByRole('button', { name: '全部项目', exact: true }).count(), 0)
-  await globalView('Today Plan')
+  await globalView('今日计划')
   await page.getByText('今日写作', { exact: true }).waitFor()
   assert.equal(await page.getByTestId('task-row').filter({ hasText: '今日实验' }).count(), 1)
   assert.equal(await page.getByText('明日实验', { exact: true }).count(), 0)
   assert.ok((await page.locator('.workspace-breadcrumb').innerText()).includes('研究计划'))
   pass(
-    'The flat planner navigation, All Tasks notes and Today Plan include work from both projects'
+    'The flat planner navigation, All Tasks notes and 今日计划 include work from both projects'
   )
 
   for (const [index, text] of [
@@ -487,7 +489,7 @@ try {
       )
     )
     await page.reload()
-    await page.getByRole('heading', { name: 'Today Plan', exact: true }).waitFor()
+    await page.getByRole('heading', { name: '今日计划', exact: true }).waitFor()
     await app.evaluate(
       ({ BrowserWindow }, [width, height]) =>
         BrowserWindow.getAllWindows()[0].setContentSize(width, height),

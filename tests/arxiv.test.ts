@@ -5,13 +5,15 @@ import { openDatabase, type DatabaseConnection } from '../src/main/database/db'
 import { LibraryRepository } from '../src/main/database/repositories/library'
 import { defaultArxivSettings, paperMetadataDefaults } from '../src/shared/arxiv'
 import type { Paper } from '../src/shared/types'
+import type { PaperOverview } from '../src/shared/overview'
+import { PaperOverviewService } from '../src/main/library/overview'
 
 vi.mock('electron', () => ({ net: {}, shell: {}, session: {} }))
 import { ArxivDailyService, arxivQuery, parseArxivFeed, relevance } from '../src/main/library/arxiv'
 
 const entries = (ids: string[]) => `<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom" xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:arxiv="http://arxiv.org/schemas/atom"><opensearch:totalResults>${ids.length}</opensearch:totalResults>${ids.map((id) => `<entry><id>http://arxiv.org/abs/${id}</id><title>Hyperspectral image reconstruction ${id}</title><author><name>A &amp; B</name></author><published>2026-09-07T02:00:00Z</published><summary>A hyperspectral image method with Mamba.</summary><arxiv:doi>10.1234/test</arxiv:doi></entry>`).join('')}</feed>`
 const resources: { connection: DatabaseConnection; service: ArxivDailyService }[] = []
-function setup(options: { fetch?: (url: string, init: RequestInit) => Promise<Response>; now?: () => Date } = {}) {
+function setup(options: { fetch?: (url: string, init: RequestInit) => Promise<Response>; now?: () => Date; translate?: (id: string, signal: AbortSignal) => Promise<PaperOverview> } = {}) {
   const connection = openDatabase(':memory:', resolve('src/main/database/migrations'))
   const repo = new LibraryRepository(connection.db)
   const fetch = vi.fn(options.fetch ?? (async (url: string) => url.includes('/api/') ? new Response(entries(['2609.00001v1', '2609.00002v2', '2609.00003v1'])) : new Response(`%PDF-1.7\n${url}\n%%EOF`)))
@@ -23,8 +25,10 @@ function setup(options: { fetch?: (url: string, init: RequestInit) => Promise<Re
   })
   const service = new ArxivDailyService(repo, save, () => undefined, '/test/Arxiv Daily', { fetch, wait: async () => undefined, now: options.now ?? (() => new Date('2026-09-08T08:00:00')) })
   service.configure({ ...defaultArxivSettings, maxPerDay: 2, directions: ['hyperspectral image'] })
+  const translate = vi.fn(options.translate ?? (async (id: string) => ({ titleZh: '高光谱图像重建方法', abstractZh: '本文提出一种基于 Mamba 的高光谱图像方法。', generatedAt: new Date().toISOString(), sourceAbstract: service.candidate(id)!.abstract })))
+  service.setTranslator(translate)
   resources.push({ connection, service })
-  return { service, repo, fetch, save }
+  return { service, repo, fetch, save, translate, connection }
 }
 async function finished(service: ArxivDailyService) {
   await vi.waitFor(() => expect(service.snapshot().running).toBe(false))
@@ -53,37 +57,119 @@ describe('arXiv parsing and research matching', () => {
   })
 })
 describe('Daily download orchestration', () => {
-  it('downloads only arXiv PDFs, serializes starts, caps a whole day and keeps source PDFs untranslated', async () => {
+  it('shows a candidate only after both Chinese fields are ready and reuses completed translations', async () => {
+    let release!: () => void
+    const gate = new Promise<void>(resolve => { release = resolve })
+    const { service, translate } = setup()
+    translate.mockImplementationOnce(async id => {
+      await gate
+      return { titleZh: '高光谱图像重建', abstractZh: '本文提出一种高光谱图像重建方法。', generatedAt: new Date().toISOString(), sourceAbstract: service.candidate(id)!.abstract }
+    })
+    service.start()
+    await vi.waitFor(() => expect(translate).toHaveBeenCalledTimes(1))
+    expect(service.snapshot().candidates).toHaveLength(0)
+    expect(service.snapshot().preparation.pending).toBe(2)
+    await expect(service.candidateAction('2609.00001', 'favorite')).rejects.toThrow('尚未就绪')
+    release(); await finished(service)
+    expect(service.snapshot().candidates).toHaveLength(2)
+    expect(service.snapshot().candidates.every(candidate => candidate.overview?.titleZh && candidate.overview.abstractZh)).toBe(true)
+    service.start(); await finished(service)
+    expect(translate).toHaveBeenCalledTimes(2)
+  })
+  it('keeps failed translations out of the queue and retries only unfinished abstracts', async () => {
+    const { service, translate, fetch, repo, connection } = setup()
+    translate.mockRejectedValueOnce(new Error('API 认证失败，请检查密钥。'))
+    service.start()
+    expect((await finished(service)).status).toBe('partial')
+    expect(service.snapshot().candidates).toHaveLength(1)
+    expect(service.snapshot().preparation).toMatchObject({ failed: 1, ready: 1, error: 'API 认证失败，请检查密钥。' })
+    service.resumeTranslations(); await finished(service)
+    expect(service.snapshot().candidates).toHaveLength(2)
+    expect(translate).toHaveBeenCalledTimes(3)
+    expect(fetch.mock.calls.filter(([url]) => url.includes('/api/'))).toHaveLength(1)
+    const candidate = service.snapshot().candidates[0]!
+    await service.candidateAction(candidate.id, 'favorite')
+    const overview = new PaperOverviewService(() => connection, async () => { throw new Error('Must reuse candidate translation') })
+    expect(overview.read(repo.papers()[0]!.id)).toEqual(candidate.overview)
+  })
+  it('restores unfinished persisted candidates and supports stopping then resuming translation', async () => {
+    const { service, repo, connection } = setup()
+    service.start(); await finished(service)
+    const saved = service.snapshot().candidates.map(candidate => ({ ...candidate, overview: undefined, translationState: 'translating' }))
+    repo.setSetting('arxiv.candidates.v1', JSON.stringify(saved))
+    service.stop()
+    const restored = new ArxivDailyService(repo, async () => { throw new Error('download not expected') }, () => undefined, '/test/Arxiv Daily')
+    resources.push({ connection, service: restored })
+    resources.splice(resources.findIndex(resource => resource.service === service), 1)
+    const translate = vi.fn(async (_id: string, signal: AbortSignal): Promise<PaperOverview> => new Promise((_resolve, reject) => {
+      signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true })
+    }))
+    restored.setTranslator(translate)
+    expect(restored.snapshot().candidates).toHaveLength(0)
+    restored.resumeTranslations()
+    await vi.waitFor(() => expect(translate).toHaveBeenCalledTimes(1))
+    restored.cancel(); await finished(restored)
+    expect(restored.snapshot().preparation).toMatchObject({ pending: 2, failed: 0 })
+    restored.setTranslator(async id => ({ titleZh: '恢复的高光谱候选', abstractZh: '恢复后完成候选摘要翻译。', generatedAt: new Date().toISOString(), sourceAbstract: restored.candidate(id)!.abstract }))
+    restored.resumeTranslations(); await finished(restored)
+    expect(restored.snapshot().candidates).toHaveLength(2)
+  })
+  it('previews candidates first, then downloads only explicitly selected arXiv PDFs', async () => {
     const { service, repo, fetch, save } = setup()
     service.start(); service.start()
-    expect((await finished(service)).downloaded).toBe(2)
+    expect((await finished(service)).candidates).toBe(3)
+    expect(repo.papers()).toHaveLength(0)
+    expect(service.snapshot().candidates).toHaveLength(2)
+    for (const candidate of [...service.snapshot().candidates]) await service.candidateAction(candidate.id, 'download')
     expect(repo.papers()).toHaveLength(2)
     expect(repo.papers().every((paper) => paper.collection === 'arxiv' && paper.translationStatus === 'idle' && !paper.translatedPath)).toBe(true)
     expect(save).toHaveBeenCalledTimes(2)
-    service.start(); expect((await finished(service)).message).toContain('上限')
+    service.start(); expect((await finished(service)).message).toContain('候选')
     expect(save).toHaveBeenCalledTimes(2)
     expect(fetch.mock.calls.every(([url]) => ['arxiv.org', 'export.arxiv.org'].includes(new URL(url).hostname))).toBe(true)
+  })
+  it('downloads a favorited candidate automatically and persists ignored candidates', async () => {
+    const { service, repo } = setup()
+    service.start(); await finished(service)
+    const [favorite, ignored] = service.snapshot().candidates
+    await service.candidateAction(favorite!.id, 'favorite')
+    await service.candidateAction(ignored!.id, 'ignore')
+    expect(repo.papers()).toHaveLength(1)
+    expect(repo.papers()[0]).toMatchObject({ arxivId: favorite!.arxivId, arxivFavorite: true })
+    const restored = new ArxivDailyService(repo, async () => { throw new Error('download not expected') }, () => undefined, '/test/Arxiv Daily', {
+      fetch: async () => new Response(entries([])), wait: async () => undefined, now: () => new Date('2026-09-08T08:00:00')
+    })
+    expect(restored.snapshot().candidates).toHaveLength(0)
+    expect(JSON.parse(repo.setting('arxiv.candidates.v1', '[]'))).toEqual(expect.arrayContaining([
+      expect.objectContaining({ arxivId: ignored!.arxivId, ignored: true })
+    ]))
+    restored.stop()
   })
   it('retains IDs after removal, fills only the remaining daily quota and reuses same-day search metadata', async () => {
     const { service, repo, fetch } = setup()
     service.start(); await finished(service)
+    await service.candidateAction(service.snapshot().candidates[0]!.id, 'download')
     const removed = repo.papers()[0]!
     repo.deletePaper(removed.id)
     expect(repo.downloads().find((item) => item.arxivId === removed.arxivId)?.paperId).toBeNull()
     service.configure({ ...service.snapshot().settings, maxPerDay: 3 })
-    service.start(); expect((await finished(service)).downloaded).toBe(1)
-    expect(repo.downloads()).toHaveLength(3)
+    service.start(); await finished(service)
+    const fresh = service.snapshot().candidates.find((candidate) => candidate.arxivId !== removed.arxivId)!
+    await service.candidateAction(fresh.id, 'download')
+    expect(repo.downloads()).toHaveLength(2)
     expect(fetch.mock.calls.filter(([url]) => url.includes('/api/'))).toHaveLength(1)
   })
   it('reports invalid PDFs and network failures accurately, and permits retry without consuming quota', async () => {
     let healthy = false
     const { service, repo } = setup({ fetch: async (url) => url.includes('/api/') ? new Response(entries(['2609.00001v1']))
       : healthy ? new Response('%PDF-1.7\nfixture') : new Response('<html>Unavailable</html>') })
-    service.start(); expect((await finished(service)).status).toBe('failed')
-    expect(repo.papers()).toHaveLength(0); expect(repo.downloads()).toHaveLength(0)
-    healthy = true
     service.start(); expect((await finished(service)).status).toBe('success')
-    expect(repo.papers()).toHaveLength(1)
+    await expect(service.candidateAction(service.snapshot().candidates[0]!.id, 'favorite')).rejects.toThrow('不是 PDF')
+    expect(repo.papers()).toHaveLength(0); expect(repo.downloads()).toHaveLength(0)
+    expect(service.snapshot().candidates[0]).toMatchObject({ favorite: true })
+    healthy = true
+    await service.candidateAction(service.snapshot().candidates[0]!.id, 'favorite')
+    expect(repo.papers()[0]).toMatchObject({ arxivFavorite: true })
   })
   it('runs automatically once per local day, respects the off switch, and allows explicit retry', async () => {
     let date = new Date('2026-09-08T23:58:00')
@@ -104,5 +190,48 @@ describe('Daily download orchestration', () => {
     service.start(); service.cancel()
     expect((await finished(service)).status).toBe('cancelled')
     expect(repo.downloads()).toHaveLength(0)
+  })
+  it('keeps other decisions available during a download, coalesces duplicates and queues PDFs', async () => {
+    let finishFirst!: () => void
+    const gate = new Promise<void>(resolve => { finishFirst = resolve })
+    const { service, repo, fetch, save } = setup({ fetch: async (url) => {
+      if (url.includes('/api/')) return new Response(entries(['2609.00001v1', '2609.00002v1', '2609.00003v1']))
+      if (url.includes('00001')) await gate
+      return new Response(`%PDF-1.7\nfixture ${url}`)
+    } })
+    service.configure({ ...service.snapshot().settings, maxPerDay: 3 })
+    service.start(); await finished(service)
+    const [first, second, ignored] = service.snapshot().candidates
+    const one = service.candidateAction(first!.id, 'favorite')
+    const repeated = service.candidateAction(first!.id, 'favorite')
+    await vi.waitFor(() => expect(service.snapshot().downloads.find(job => job.id === first!.id)?.status).toBe('downloading'))
+    const two = service.candidateAction(second!.id, 'favorite')
+    await service.candidateAction(ignored!.id, 'ignore')
+    expect(service.snapshot().running).toBe(false)
+    expect(service.busy()).toBe(true)
+    expect(service.snapshot().downloads.find(job => job.id === second!.id)?.status).toBe('queued')
+    expect(service.snapshot().candidates).toHaveLength(2)
+    expect(fetch.mock.calls.filter(([url]) => url.includes('/pdf/'))).toHaveLength(1)
+    finishFirst(); await Promise.all([one, repeated, two])
+    expect(save).toHaveBeenCalledTimes(2)
+    expect(repo.papers().every(p => p.arxivFavorite)).toBe(true)
+    expect(service.busy()).toBe(false)
+  })
+  it('preserves ignores made while a search is waiting and skips cancelled queued downloads', async () => {
+    let finishPdf!: () => void
+    const gate = new Promise<void>(resolve => { finishPdf = resolve })
+    const { service, repo } = setup({ fetch: async url => {
+      if (url.includes('/api/')) return new Response(entries(['2609.00001v1', '2609.00002v1']))
+      await gate; return new Response('%PDF-1.7\nfixture')
+    } })
+    service.start(); await finished(service)
+    const [first, other] = service.snapshot().candidates
+    const download = service.candidateAction(first!.id, 'favorite')
+    const queued = service.candidateAction(other!.id, 'favorite')
+    await service.candidateAction(other!.id, 'ignore')
+    service.start()
+    finishPdf(); await Promise.all([download, queued]); await finished(service)
+    expect(repo.papers()).toHaveLength(1)
+    expect(service.snapshot().candidates.find(p => p.id === other!.id)).toBeUndefined()
   })
 })

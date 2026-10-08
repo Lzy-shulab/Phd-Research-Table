@@ -9,13 +9,14 @@ import {
   projectPatchSchema,
   reorderSchema,
   taskCreateSchema,
-  taskPatchSchema
+  taskPatchSchema,
+  taskSeriesSchema
 } from '../../domain/validation'
 import { TaskRepository } from '../database/repositories/tasks'
 import { ProjectRepository } from '../database/repositories/projects'
 import { SettingsRepository } from '../database/repositories/settings'
 import type { DatabaseConnection } from '../database/db'
-import type { Result } from '../../shared/types'
+import type { Result, TaskTemplate } from '../../shared/types'
 import { LibraryService } from '../library/service'
 import { arxivSettingsSchema, publicationFields, publicationSchema } from '../../domain/research'
 import { isPublicationDate } from '../../domain/validation'
@@ -37,6 +38,10 @@ import { assistantRecognitionSchema, assistantRequestSchema, assistantSettingsSc
 import { overviewRequestSchema } from '../../domain/overview'
 import { PaperOverviewService } from '../library/overview'
 import { UpdateService } from '../update/service'
+import { CountdownRepository } from '../database/repositories/countdowns'
+import { countdownInputSchema } from '../../domain/countdowns'
+import { ReportsRepository } from '../database/repositories/reports'
+import { readingDateInputSchema, reportSettingsSchema, stipendInputSchema, checkinInputSchema } from '../../domain/reports'
 
 export function registerIpc(
   getConnection: () => DatabaseConnection,
@@ -84,10 +89,58 @@ export function registerIpc(
     })
   }
   const taskRepo = () => new TaskRepository(getConnection().db)
+  const reportsRepo = () => new ReportsRepository(getConnection().db)
+  handle('reports:snapshot', () => reportsRepo().snapshot())
+  handle('reports:checkin-save', (input, id) => reportsRepo().saveCheckin(checkinInputSchema.parse(input), idSchema.optional().parse(id)))
+  handle('reports:checkin-delete', id => reportsRepo().deleteCheckin(idSchema.parse(id)))
+  handle('reports:settings', input => reportsRepo().settings(reportSettingsSchema.parse(input)))
+  handle('reports:stipend-save', (input, id) => reportsRepo().saveStipend(stipendInputSchema.parse(input), idSchema.optional().parse(id)))
+  handle('reports:stipend-delete', id => reportsRepo().deleteStipend(idSchema.parse(id)))
+  handle('reports:reading-date', input => reportsRepo().readingDate(readingDateInputSchema.parse(input)))
+  const countdownRepo = () => new CountdownRepository(getConnection().db)
+  let countdownTimer: ReturnType<typeof setTimeout> | undefined
+  const refreshCountdowns = () => {
+    clearTimeout(countdownTimer)
+    const items = countdownRepo().list()
+    if (items.length && !relocating) {
+      const nextDeadline = Math.min(...items.map(item => new Date(item.deadline).getTime()))
+      countdownTimer = setTimeout(catchUpCountdowns, Math.min(2_147_483_647, Math.max(1, nextDeadline - Date.now())))
+      countdownTimer.unref()
+    }
+    return items
+  }
+  const catchUpCountdowns = () => {
+    if (relocating) return
+    try { refreshCountdowns() } catch { console.error('Important countdowns could not refresh; saved records were retained.') }
+  }
+  handle('countdowns:list', refreshCountdowns)
+  handle('countdown:save', (input, id) => {
+    const item = countdownRepo().save(countdownInputSchema.parse(input), idSchema.optional().parse(id))
+    refreshCountdowns()
+    return item
+  })
+  handle('countdown:delete', id => { countdownRepo().remove(idSchema.parse(id)); refreshCountdowns() })
+  catchUpCountdowns()
+  powerMonitor.on('resume', catchUpCountdowns)
   const assistant = new AssistantService(getConnection)
-  const overviews = new PaperOverviewService(getConnection, (title, abstract) => assistant.translateOverview(title, abstract))
+  handle('window:palette', (input) => {
+    const palette = z.object({ background: z.string().regex(/^#[a-f0-9]{6}$/i), foreground: z.string().regex(/^#[a-f0-9]{6}$/i) }).strict().parse(input)
+    const window = getWindow()
+    if (window && !window.isDestroyed()) {
+      window.setBackgroundColor(palette.background)
+      if (process.platform === 'win32') window.setTitleBarOverlay({ color: palette.background, symbolColor: palette.foreground })
+    }
+  })
+  const overviews = new PaperOverviewService(getConnection, (title, abstract, signal) => assistant.translateOverview(title, abstract, signal),
+    (id) => library().arxiv.candidate(id))
   handle('library:overview', (id) => overviews.read(idSchema.parse(id)))
   handle('library:overview-generate', (input) => overviews.generate(overviewRequestSchema.parse(input)))
+  handle('arxiv:overview', async input => {
+    const request = z.object({ id: z.string().min(1).max(120), regenerate: z.boolean().optional() }).strict().parse(input)
+    const overview = await overviews.generateCandidate(request)
+    library().arxiv.updateOverview(request.id, overview)
+    return overview
+  })
   handle('assistant:settings', () => assistant.snapshot())
   handle('assistant:save', (input) => assistant.save(assistantSettingsSchema.parse(input)))
   handle('assistant:recognition', (enabled) => assistant.setQuickRecognition(assistantRecognitionSchema.parse(enabled)))
@@ -112,11 +165,19 @@ export function registerIpc(
   const reminders = new SubmissionReminders(getConnection, getWindow, () => relocating, submissionsChanged)
   let service: LibraryService | undefined
   const translationEngineSession = session.fromPartition('workbench-translation-engine-network', { cache: false })
-  const library = () => service ??= new LibraryService(getConnection(), getWindow, undefined, {
-    translationEngineRoot: join(app.getPath('userData'), 'translation-engine'),
-    // A separate Chromium session follows the Windows proxy/PAC and certificate settings.
-    translationEngineFetcher: ((input, init) => translationEngineSession.fetch(String(input), init)) as typeof fetch
-  })
+  const library = () => {
+    if (!service) {
+      service = new LibraryService(getConnection(), getWindow, undefined, {
+        translationEngineRoot: join(app.getPath('userData'), 'translation-engine'),
+        // A separate Chromium session follows the Windows proxy/PAC and certificate settings.
+        translationEngineFetcher: ((input, init) => translationEngineSession.fetch(String(input), init)) as typeof fetch
+      })
+      service.arxiv.setTranslator((id, signal) => overviews.generateCandidate({ id }, signal))
+      const current = service
+      queueMicrotask(() => { if (service === current) current.arxiv.resumeTranslations() })
+    }
+    return service
+  }
   const updateSession = session.fromPartition('workbench-update-network', { cache: false })
   const updates = new UpdateService({
     currentVersion: app.getVersion(),
@@ -138,6 +199,12 @@ export function registerIpc(
     await updates.install()
   })
   const folderSchema = z.object({ name: z.string().trim().min(1, '请填写文件夹名称。').max(100), parentId: idSchema.nullable() }).strict()
+  const taskTemplateSchema = z.object({
+    id: idSchema, name: z.string().trim().min(1).max(100), title: z.string().trim().min(1).max(500),
+    description: z.string().max(50000), projectId: idSchema.nullable(), priority: z.enum(['none', 'low', 'medium', 'high']),
+    estimatedMinutes: z.number().int().min(1).max(100000).nullable(),
+    checklist: z.array(z.object({ id: idSchema, text: z.string().trim().min(1).max(500), completed: z.boolean() }).strict()).max(100)
+  }).strict()
   const variantSchema = z.enum(['source', 'translated'])
   const translationProfileSchema = z.object({
     id: z.string().min(1).max(100).optional(),
@@ -152,7 +219,19 @@ export function registerIpc(
     folderId: idSchema.nullable(), title: z.string().trim().min(1, '请填写文献标题。').max(1000),
     authors: z.string().max(2000), journal: z.string().max(500), year: z.string().max(10), notes: z.string().max(50000),
     pageCount: z.number().int().min(1).max(100000), readPage: z.number().int().min(1).max(100000),
-    translatedReadPage: z.number().int().min(1).max(100000), readProgress: z.number().int().min(0).max(100), lastReadAt: z.iso.datetime().nullable(),
+    translatedReadPage: z.number().int().min(1).max(100000), readProgress: z.number().int().min(0).max(100),
+    maxReadPage: z.number().int().min(0).max(100000), readingStatus: z.enum(['unread', 'reading', 'done']),
+    tags: z.array(z.string().trim().min(1).max(80)).max(30),
+    excerpts: z.array(z.object({ id: idSchema, page: z.number().int().min(1).max(100000), text: z.string().trim().min(1).max(10000), createdAt: z.iso.datetime() }).strict()).max(500),
+    highlights: z.array(z.object({
+      id: idSchema, page: z.number().int().min(1).max(100000), text: z.string().trim().min(1).max(10000),
+      color: z.enum(['focus', 'method', 'evidence', 'question']), createdAt: z.iso.datetime(),
+      variant: z.enum(['source', 'translated']).optional(),
+      rects: z.array(z.object({ x: z.number().min(0).max(1), y: z.number().min(0).max(1), width: z.number().positive().max(1), height: z.number().positive().max(1) }).strict()).min(1).max(200)
+    }).strict()).max(1000),
+    authorRole: z.string().max(200), coFirstAuthor: z.boolean(), correspondingAuthor: z.boolean(), partitionYear: z.string().regex(/^$|^\d{4}$/),
+    matchReason: z.string().max(2000), arxivFavorite: z.boolean(), arxivIgnored: z.boolean(), linkedSubmissionId: idSchema.nullable(),
+    lastReadAt: z.iso.datetime().nullable(),
     doi: publicationFields.doi, casPartition: publicationFields.casPartition, jcrQuartile: publicationFields.jcrQuartile,
     honors: publicationFields.honors,
     publishedDate: z.string().refine((value) => !value || isPublicationDate(value), '请输入有效发表年份、月份或日期。')
@@ -192,18 +271,24 @@ export function registerIpc(
       return { snapshot: new StoragePaths(new LibraryRepository(getConnection().db), getConnection().path).snapshot(), retainedSources: report.retainedSources }
     } finally {
       relocating = false; runtime.setRelocating(false)
+      catchUpCountdowns()
       if (process.env.WORKBENCH_DISABLE_ARXIV_AUTO !== '1') library().arxiv.startAutomatic()
     }
   })
   handle('arxiv:settings', (settings) => library().arxiv.configure(arxivSettingsSchema.parse(settings)))
   handle('arxiv:run', () => library().arxiv.start())
   handle('arxiv:cancel', () => library().arxiv.cancel())
+  handle('arxiv:translations-retry', () => library().arxiv.resumeTranslations())
   handle('arxiv:directory', () => library().arxiv.reveal())
+  handle('arxiv:candidate-action', (id, action) => library().arxiv.candidateAction(
+    z.string().min(1).max(100).parse(id), z.enum(['favorite', 'unfavorite', 'ignore', 'download']).parse(action)))
   handle('publication:pick', () => library().pickPublicationPdf())
   handle('publication:read-selected', (path) => library().readPublicationPdf(z.string().min(1).max(32000).parse(path)))
   handle('publication:metadata-preview', (input, overrides) => previewPublicationMetadata(localMetadataSchema.parse(input), library().repo.setting('metadata.online', 'true') === 'true',
     z.object({ title: z.string().max(1000), doi: publicationFields.doi }).strict().parse(overrides)))
-  handle('publication:create', (path, metadata) => library().createPublication(z.string().min(1).max(32000).parse(path), publicationSchema.parse(metadata)))
+  handle('publication:create', (path, metadata) => library().createPublication(z.string().max(32000).nullable().parse(path), publicationSchema.parse(metadata)))
+  handle('publication:attach', (id, path) => library().attachPublicationPdf(idSchema.parse(id), z.string().min(1).max(32000).parse(path)))
+  handle('publication:export', (format, ids) => library().exportPublications(z.enum(['bibtex', 'csv']).parse(format), z.array(idSchema).optional().parse(ids)))
   handle('library:folder-create', (input) => {
     const folder = library().repo.createFolder(folderSchema.parse(input)); library().changed(); return folder
   })
@@ -226,6 +311,9 @@ export function registerIpc(
   })
   handle('library:paper-delete', (id) => library().delete(idSchema.parse(id)))
   handle('library:retry', (id) => library().retry(idSchema.parse(id)))
+  handle('library:translation-cancel', (id) => library().cancelTranslation(idSchema.parse(id)))
+  handle('library:translation-pause', (paused) => library().setTranslationPaused(z.boolean().parse(paused)))
+  handle('library:translation-reorder', (ids) => library().reorderTranslations(reorderSchema.parse(ids)))
   handle('library:read', (id, variant) => library().read(idSchema.parse(id), variantSchema.parse(variant)))
   handle('library:export', (id, variant) => library().export(idSchema.parse(id), variantSchema.parse(variant)))
   handle('library:health', () => library().health())
@@ -244,6 +332,10 @@ export function registerIpc(
     }
     library().repo.setSetting('translation.auto', String(value)); library().changed()
   })
+  handle('settings:reuse-assistant-translation', () => {
+    const profile = assistant.siliconFlowRuntime()
+    return library().saveProfile({ id: 'siliconflow-api', name: 'SiliconFlow 自有额度', provider: 'siliconflow', ...profile })
+  })
   handle('workbench:bootstrap', () => {
     const connection = getConnection()
     reminders.start()
@@ -257,24 +349,51 @@ export function registerIpc(
     }
   })
   handle('task:create', (input) => taskRepo().create(taskCreateSchema.parse(input)))
+  handle('task:series-create', (input) => taskRepo().createSeries(taskSeriesSchema.parse(input)))
+  handle('task:series-update', (seriesId, fromDate, patch) => taskRepo().updateSeries(
+    idSchema.parse(seriesId), z.string().regex(/^\d{4}-\d{2}-\d{2}$/).parse(fromDate), taskPatchSchema.parse(patch)
+  ))
   handle('task:update', (id, patch) =>
     taskRepo().update(idSchema.parse(id), taskPatchSchema.parse(patch))
   )
-  handle('task:complete', (id, completed) =>
-    taskRepo().complete(idSchema.parse(id), z.boolean().parse(completed))
-  )
+  handle('task:complete', (id, completed) => {
+    const next = taskRepo().complete(idSchema.parse(id), z.boolean().parse(completed))
+    submissionRepo().syncLinkedTask(next.id, next.status === 'completed')
+    submissionsChanged()
+    return next
+  })
   handle('task:delete', (id) => taskRepo().delete(idSchema.parse(id)))
   handle('task:reorder', (ids) => taskRepo().reorder(reorderSchema.parse(ids)))
+  handle('task:templates', () => {
+    const parsed = z.array(taskTemplateSchema).safeParse(new SettingsRepository(getConnection().db).getTaskTemplates())
+    return parsed.success ? parsed.data : []
+  })
+  handle('task:template-save', (input) => {
+    const template = taskTemplateSchema.parse(input) as TaskTemplate
+    const repo = new SettingsRepository(getConnection().db)
+    const parsed = z.array(taskTemplateSchema).safeParse(repo.getTaskTemplates())
+    const current = parsed.success ? parsed.data : []
+    const next = [...current.filter((item) => item.id !== template.id), template].slice(-50)
+    repo.setTaskTemplates(next)
+    return next
+  })
+  handle('task:template-delete', (id) => {
+    const templateId = idSchema.parse(id), repo = new SettingsRepository(getConnection().db)
+    const parsed = z.array(taskTemplateSchema).safeParse(repo.getTaskTemplates())
+    const next = (parsed.success ? parsed.data : []).filter((item) => item.id !== templateId)
+    repo.setTaskTemplates(next)
+    return next
+  })
   handle('project:create', (input) => projectRepo().create(projectCreateSchema.parse(input)))
   handle('project:update', (id, patch) =>
     projectRepo().update(idSchema.parse(id), projectPatchSchema.parse(patch))
   )
-  handle('project:delete', (id, moveToId) => projectRepo().delete(idSchema.parse(id), idSchema.optional().parse(moveToId)))
+  handle('project:delete', (id, moveToId, taskAction) => projectRepo().delete(idSchema.parse(id), idSchema.optional().parse(moveToId), z.enum(['delete', 'retain', 'transfer']).optional().parse(taskAction)))
   handle('settings:appearance', (input) => {
     const appearance = appearanceSchema.parse(input)
     new SettingsRepository(getConnection().db).setAppearance(appearance)
     nativeTheme.themeSource = appearance
     return appearance
   })
-  return () => { encouragement.stop(); powerMonitor.removeListener('resume', resumeEncouragement); reminders.stop(); service?.stop() }
+  return () => { clearTimeout(countdownTimer); powerMonitor.removeListener('resume', catchUpCountdowns); encouragement.stop(); powerMonitor.removeListener('resume', resumeEncouragement); reminders.stop(); service?.stop() }
 }

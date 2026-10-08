@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { selectTasks, groupTasks, sortTasks } from '../src/domain/planner'
+import { selectTasks, groupTasks, sortTasks, todayPlan } from '../src/domain/planner'
 import { layoutSchedule, MINUTE_HEIGHT, minuteAtPosition, moveInterval, toMinutes, timeFromMinutes } from '../src/domain/schedule'
 import type { Task } from '../src/shared/types'
 
@@ -15,6 +15,16 @@ const task = (id: string, patch: Partial<Task> = {}): Task => ({
   endTime: null,
   dueDate: null,
   estimatedMinutes: null,
+  deferredUntil: null,
+  seriesId: null,
+  recurrence: null,
+  occurrenceDate: null,
+  checklist: [],
+  milestone: '',
+  linkedPaperId: null,
+  linkedSubmissionId: null,
+  sourceType: 'manual',
+  sourceId: null,
   order: 0,
   createdAt: '2026-09-05T00:00:00Z',
   updatedAt: '2026-09-05T00:00:00Z',
@@ -55,17 +65,31 @@ describe('Planner view semantics', () => {
     task('done', { status: 'completed', completedAt: '2026-09-05T01:00:00Z' }),
     task('due-only', { dueDate: '2026-09-05' })
   ]
-  it('shows only today in Today Plan and retains past work in all tasks', () => {
+  it('brings unfinished overdue work into Today Plan and retains it in all tasks', () => {
     expect(selectTasks(tasks, 'inbox', '2026-09-05', null).map((t) => t.id)).toEqual([
       'inbox',
       'due-only'
     ])
-    expect(selectTasks(tasks, 'today', '2026-09-05', null).map((t) => t.id)).toEqual(['today', 'due-only'])
+    expect(selectTasks(tasks, 'today', '2026-09-05', null).map((t) => t.id)).toEqual(['today', 'past', 'due-only'])
     expect(selectTasks(tasks, 'upcoming', '2026-09-05', null).map((t) => t.id)).toEqual(['future'])
     expect(selectTasks(tasks, 'all', '2026-09-05', null)).toHaveLength(6)
     expect(selectTasks(tasks, 'project', '2026-09-05', 'p').map((t) => t.id)).toEqual(['today'])
     expect(selectTasks(tasks, 'completed', '2026-09-05', null).map((t) => t.id)).toEqual(['done'])
     expect(groupTasks(selectTasks(tasks, 'upcoming', '2026-09-05', null))).toHaveLength(1)
+  })
+  it('shows tasks due today even when planned for another date, without counting them twice', () => {
+    const rows = [
+      task('scheduled', { scheduledDate: '2026-09-05', dueDate: '2026-09-05', status: 'planned' }),
+      task('due-future', { scheduledDate: '2026-09-08', dueDate: '2026-09-05', status: 'planned' }),
+      task('overdue', { scheduledDate: '2026-09-01', status: 'planned' }),
+      task('completed', { scheduledDate: '2026-09-05', status: 'completed' })
+    ]
+    const plan = todayPlan(rows, '2026-09-05')
+    expect(plan.scheduled.map((item) => item.id)).toEqual(['scheduled'])
+    expect(plan.dueOnly.map((item) => item.id)).toEqual(['due-future'])
+    expect(plan.overdue.map((item) => item.id)).toEqual(['overdue'])
+    expect(plan.completed.map((item) => item.id)).toEqual(['completed'])
+    expect(selectTasks(rows, 'today', '2026-09-05', null).map((item) => item.id)).toEqual(['scheduled', 'due-future', 'overdue'])
   })
   it('sorts time slots and keeps unspecified dates at the end', () => {
     const rows = [
@@ -79,6 +103,19 @@ describe('Planner view semantics', () => {
       'later',
       'anytime',
       'unscheduled'
+    ])
+  })
+  it('puts actionable dates first while keeping deferred work and completed tasks later', () => {
+    const rows = [
+      task('undated', { order: 0, priority: 'high' }),
+      task('completed', { scheduledDate: '2026-09-01', status: 'completed', completedAt: '2026-09-05T01:00:00Z' }),
+      task('tomorrow-due', { dueDate: '2026-09-06' }),
+      task('deferred', { scheduledDate: '2026-09-01', deferredUntil: '2026-09-08' }),
+      task('today', { scheduledDate: '2026-09-05' }),
+      task('overdue', { dueDate: '2026-09-04' })
+    ]
+    expect(sortTasks(rows, 'focus').map((item) => item.id)).toEqual([
+      'overdue', 'today', 'tomorrow-due', 'deferred', 'undated', 'completed'
     ])
   })
   it('keeps project views scoped while global task views ignore a previous project', () => {

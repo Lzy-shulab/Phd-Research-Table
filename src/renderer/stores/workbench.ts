@@ -6,10 +6,12 @@ import type {
   Project,
   ProjectInput,
   ProjectPatch,
+  ProjectTaskAction,
   Result,
   Section,
   Task,
   TaskCreate,
+  TaskSeriesInput,
   TaskPatch
 } from '../../shared/types'
 import { dateKey } from '../lib/dates'
@@ -31,6 +33,7 @@ interface WorkbenchState {
   appearance: Appearance
   databasePath: string
   section: Section
+  settingsTarget: 'assistant' | null
   view: PlannerView
   projectId: string | null
   selectedTaskId: string | null
@@ -45,11 +48,15 @@ interface WorkbenchState {
   bootstrap: () => Promise<void>
   navigate: (view: PlannerView, projectId?: string | null) => void
   setSection: (section: Section) => void
+  openAssistantSettings: () => void
+  clearSettingsTarget: () => void
   selectTask: (id: string | null) => void
   focusCapture: () => void
   notify: (message: string, kind?: Notice['kind']) => void
   dismiss: (id: number) => void
   createTask: (input: TaskCreate) => Promise<Task | null>
+  createTaskSeries: (input: TaskSeriesInput) => Promise<Task[]>
+  updateTaskSeries: (seriesId: string, fromDate: string, patch: TaskPatch) => Promise<Task[]>
   editTask: (id: string, patch: TaskPatch, immediate?: boolean) => void
   flushTask: (id: string) => Promise<boolean>
   flushAll: () => Promise<boolean>
@@ -58,7 +65,7 @@ interface WorkbenchState {
   reorderTasks: (ids: string[]) => Promise<void>
   createProject: (input: ProjectInput) => Promise<Project | null>
   updateProject: (id: string, patch: ProjectPatch) => Promise<boolean>
-  deleteProject: (id: string, moveToId?: string) => Promise<boolean>
+  deleteProject: (id: string, moveToId?: string, taskAction?: ProjectTaskAction) => Promise<boolean>
   setAppearance: (appearance: Appearance) => Promise<void>
 }
 const timers = new Map<string, ReturnType<typeof setTimeout>>()
@@ -95,6 +102,7 @@ export const useWorkbench = create<WorkbenchState>((set, get) => ({
   appearance: 'system',
   databasePath: '',
   section: 'planner',
+  settingsTarget: null,
   projectFolds: {},
   setProjectFolds: (projectFolds) => set({ projectFolds }),
   view: 'today',
@@ -140,6 +148,8 @@ export const useWorkbench = create<WorkbenchState>((set, get) => ({
       selectedTaskId: null
     }),
   setSection: (section) => set({ section, selectedTaskId: null }),
+  openAssistantSettings: () => set({ section: 'settings', selectedTaskId: null, settingsTarget: 'assistant' }),
+  clearSettingsTarget: () => set({ settingsTarget: null }),
   selectTask: (selectedTaskId) => set({ selectedTaskId }),
   focusCapture: () =>
     set((state) => ({
@@ -164,6 +174,31 @@ export const useWorkbench = create<WorkbenchState>((set, get) => ({
       } catch (error) {
         get().notify(errorText(error))
         return null
+      }
+    }),
+  createTaskSeries: (input) =>
+    serialize(async () => {
+      try {
+        const created = unwrap(await window.workbench.createTaskSeries(input))
+        set((state) => ({ tasks: [...state.tasks, ...created] }))
+        get().notify(`已创建 ${created.length} 次独立安排。`, 'info')
+        return created
+      } catch (error) {
+        get().notify(errorText(error))
+        return []
+      }
+    }),
+  updateTaskSeries: (seriesId, fromDate, patch) =>
+    serialize(async () => {
+      try {
+        const updated = unwrap(await window.workbench.updateTaskSeries(seriesId, fromDate, patch))
+        const byId = new Map(updated.map((task) => [task.id, task]))
+        set((state) => ({ tasks: state.tasks.map((task) => byId.get(task.id) ?? task) }))
+        get().notify(`已更新本次及后续 ${updated.length} 项安排。`, 'info')
+        return updated
+      } catch (error) {
+        get().notify(errorText(error))
+        return []
       }
     }),
   editTask: (id, patch, immediate = false) => {
@@ -282,11 +317,11 @@ export const useWorkbench = create<WorkbenchState>((set, get) => ({
         return false
       }
     }),
-  deleteProject: async (id, moveToId) => {
+  deleteProject: async (id, moveToId, taskAction) => {
     if (!(await get().flushAll())) return false
     return serialize(async () => {
       try {
-        unwrap(await window.workbench.deleteProject(id, moveToId))
+        unwrap(await window.workbench.deleteProject(id, moveToId, taskAction))
         const snapshot = unwrap(await window.workbench.bootstrap())
         set({ ...snapshot, projectId: null, view: 'all', selectedTaskId: null })
         return true

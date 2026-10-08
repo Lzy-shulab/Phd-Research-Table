@@ -1,9 +1,11 @@
 import { randomUUID } from 'node:crypto'
-import { and, asc, desc, eq } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm'
 import { DomainError } from '../../../domain/errors'
 import type { FolderInput, Paper, PaperPatch, PaperCollection } from '../../../shared/types'
 import type { WorkbenchDatabase } from '../db'
 import { appSettings, libraryFolders, papers, arxivDownloads } from '../schema'
+import { localDay } from '../../../shared/arxiv'
+import { readingDatesSchema } from '../../../domain/reports'
 
 export class LibraryRepository {
   constructor(private readonly db: WorkbenchDatabase) {}
@@ -84,9 +86,29 @@ export class LibraryRepository {
     try { const fields = JSON.parse(paper.metadataLockedFields) as unknown; if (Array.isArray(fields)) locked = fields.filter((field): field is string => typeof field === 'string') } catch { /* Preserve older records without explicit locks. */ }
     if (manualMetadata) for (const key of ['title', 'authors', 'journal', 'year', 'doi', 'publishedDate'] as const)
       if (patch[key] !== undefined && patch[key] !== paper[key]) locked.push(key)
-    const normalized = { ...patch, ...(patch.readProgress === undefined ? {} : { readProgress: Math.max(paper.readProgress, patch.readProgress) }),
+    const nextMax = patch.maxReadPage === undefined ? paper.maxReadPage : Math.max(paper.maxReadPage, patch.maxReadPage)
+    const requestedProgress = patch.readProgress === undefined ? paper.readProgress : Math.max(paper.readProgress, patch.readProgress)
+    const normalized = { ...patch, ...(patch.maxReadPage === undefined ? {} : { maxReadPage: nextMax }),
+      ...(patch.readProgress === undefined ? {} : { readProgress: requestedProgress }),
+      ...(patch.readingStatus === 'done' ? { readProgress: 100 } : {}),
+      ...(patch.readingStatus === 'unread' ? { readProgress: 0, maxReadPage: 0 } : {}),
+      ...(patch.readingStatus === 'reading' ? { readProgress: Math.min(99, Math.max(requestedProgress, paper.pageCount ? Math.round(nextMax / paper.pageCount * 100) : 0)) } : {}),
       ...(manualMetadata ? { metadataLockedFields: JSON.stringify([...new Set(locked)]) } : {}) }
-    this.db.update(papers).set({ ...normalized, updatedAt: new Date().toISOString() }).where(eq(papers.id, id)).run()
+    this.db.transaction(tx => {
+      const now = new Date()
+      tx.update(papers).set({ ...normalized, updatedAt: now.toISOString() }).where(eq(papers.id, id)).run()
+      if (paper.collection !== 'publication' && patch.readingStatus === 'done' && paper.readingStatus !== 'done') {
+        const key = 'research.reading-dates.v1'
+        const existing = tx.select().from(appSettings).where(eq(appSettings.key, key)).get()
+        let dates: Record<string, string>
+        try { dates = readingDatesSchema.parse(existing ? JSON.parse(existing.value) : {}) }
+        catch { throw new DomainError('VALIDATION', '阅读日期记录无法读取，本次修改未保存。') }
+        if (!dates[id]) {
+          const value = JSON.stringify({ ...dates, [id]: localDay(now) })
+          tx.insert(appSettings).values({ key, value }).onConflictDoUpdate({ target: appSettings.key, set: { value } }).run()
+        }
+      }
+    })
     return this.paper(id)
   }
   metadata(id: string, patch: Partial<Pick<Paper, 'title' | 'authors' | 'journal' | 'year' | 'doi' | 'publishedDate' | 'pageCount' | 'metadataStatus' | 'metadataSource' | 'metadataMessage' | 'metadataCheckedAt' | 'metadataLockedFields'>>) {
@@ -95,10 +117,20 @@ export class LibraryRepository {
     return this.paper(id)
   }
   translation(id: string, status: Paper['translationStatus'], error = '', path?: string) {
+    const nextOrder = status === 'queued'
+      ? Number(this.db.select({ value: sql<number>`coalesce(max(${papers.translationOrder}), 0) + 1` }).from(papers).get()?.value ?? 1)
+      : undefined
     this.db.update(papers).set({
       translationStatus: status, translationError: error,
+      ...(nextOrder === undefined ? {} : { translationOrder: nextOrder }),
       ...(path ? { translatedPath: path } : {}), updatedAt: new Date().toISOString()
     }).where(eq(papers.id, id)).run()
+  }
+  reorderTranslations(ids: string[]) {
+    const queued = this.db.select().from(papers).where(inArray(papers.id, ids)).all()
+    if (queued.length !== ids.length || queued.some((paper) => paper.translationStatus !== 'queued'))
+      throw new DomainError('VALIDATION', '只能调整仍在排队的翻译任务。')
+    this.db.transaction((tx) => ids.forEach((id, index) => tx.update(papers).set({ translationOrder: index + 1 }).where(eq(papers.id, id)).run()))
   }
   deletePaper(id: string) {
     this.paper(id)

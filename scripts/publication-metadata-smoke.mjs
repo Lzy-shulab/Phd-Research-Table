@@ -23,7 +23,7 @@ async function launch() {
   page = await app.firstWindow()
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].hide())
   page.on('pageerror', (error) => errors.push(error.message))
-  await page.getByRole('heading', { name: 'Today Plan', exact: true }).waitFor()
+  await page.getByRole('heading', { name: '今日计划', exact: true }).waitFor()
   await page.getByRole('navigation', { name: '科研工作空间' }).getByRole('button', { name: '科研成果', exact: true }).click()
   await page.getByRole('heading', { name: '科研成果', exact: true }).waitFor()
 }

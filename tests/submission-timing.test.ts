@@ -10,6 +10,8 @@ const input = {
 }
 const submission: Submission = {
   ...input, id: 'submission', currentStage: 'With editor', submittedDate: '2026-08-28',
+  revisionCompleted: false, ended: false, projectId: null, manuscriptPaperId: null,
+  manuscriptGroupId: 'submission', sourceSubmissionId: null, reviewItems: [],
   stages: input.stages.map((stage, position) => ({ ...stage, id: `stage-${position}`, submissionId: 'submission', position, createdAt: '2026-09-10T10:00:00Z', updatedAt: '2026-09-10T10:00:00Z' })),
   createdAt: '2026-09-10T10:00:00Z', updatedAt: '2026-09-10T10:00:00Z'
 }

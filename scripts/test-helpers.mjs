@@ -22,6 +22,6 @@ export async function ensureTestProject(page) {
   })
   if (created) {
     await page.reload()
-    await page.getByRole('heading', { name: 'Today Plan', exact: true }).waitFor()
+    await page.getByRole('heading', { name: '今日计划', exact: true }).waitFor()
   }
 }

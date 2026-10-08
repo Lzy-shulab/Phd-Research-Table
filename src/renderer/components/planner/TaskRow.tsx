@@ -6,7 +6,8 @@ import { CSS } from '@dnd-kit/utilities'
 import type { Task } from '../../../shared/types'
 import { useWorkbench } from '../../stores/workbench'
 import { cn } from '../../lib/utils'
-import { calendarLabel } from '../../lib/dates'
+import { calendarLabel, dateKey } from '../../lib/dates'
+import { isOverdueTask } from '../../../domain/planner'
 
 export function TaskRow({
   task,
@@ -22,6 +23,9 @@ export function TaskRow({
   const selected = useWorkbench((s) => s.selectedTaskId === task.id)
   const complete = useWorkbench((s) => s.completeTask)
   const project = projects.find((p) => p.id === task.projectId)
+  const today = dateKey(new Date())
+  const dateState = task.status === 'completed' ? 'completed' : isOverdueTask(task, today) ? 'overdue' : task.scheduledDate === today || task.dueDate === today ? 'today' : !task.scheduledDate && !task.dueDate ? 'unscheduled' : null
+  const dateStateLabel = dateState === 'completed' ? '已完成' : dateState === 'overdue' ? '逾期' : dateState === 'today' ? '今天' : '无日期'
   const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({
     id: task.id,
     disabled: !sortable
@@ -65,6 +69,7 @@ export function TaskRow({
       <button className="task-content" onClick={() => select(task.id)}>
         <span className="task-title">{task.title}</span>
         <span className="task-meta">
+          {showDate && dateState && <span className={`task-date-state ${dateState}`}>{dateStateLabel}</span>}
           {!project && <span className="danger-text">待归属项目</span>}
           {project && (
             <span>

@@ -1,65 +1,192 @@
-# PhD 科研工作台 v0.7.7 设计说明
+---
+name: PhD 科研工作台 v0.8.19
+description: 几何研究手记，壁纸联动的玻璃外壳与清晰工作表面
+colors:
+  app-background: "#e4e9ec"
+  accent: "#405663"
+  accent-hover: "#36454f"
+  on-accent: "#fcfcfd"
+  action-companion: "#376251"
+  on-companion: "#fcfdfd"
+  action-warm: "#6d5431"
+  on-warm: "#fdfdfb"
+  action-positive: "#38614f"
+  on-positive: "#fcfdfd"
+  surface-solid: "#f9fafa"
+  surface-workspace: "#f1f3f4"
+  surface-raised: "#fcfdfd"
+  surface-inset: "#e5e9eb"
+  surface-feature: "#f6f8f9"
+  surface-companion: "#f5f9f8"
+  surface-warm: "#faf8f4"
+  text-primary: "#26292c"
+  text-secondary: "#535b60"
+  text-muted: "#586064"
+  border-default: "#545b5f38"
+  glass-highlight: "#ffffffb8"
+  glass-shade: "#343f4618"
+  shadow-ink: "#30373c"
+typography:
+  body:
+    fontFamily: "'Segoe UI Variable Text', 'Segoe UI', 'Microsoft YaHei UI', 'Microsoft YaHei', system-ui, -apple-system, sans-serif"
+    fontSize: "14px"
+    fontWeight: 400
+  title:
+    fontFamily: "'Segoe UI Variable Text', 'Segoe UI', 'Microsoft YaHei UI', 'Microsoft YaHei', system-ui, -apple-system, sans-serif"
+    fontSize: "2.142857rem"
+    fontWeight: 610
+    lineHeight: 1.25
+    letterSpacing: "-0.035em"
+  control:
+    fontSize: "0.928571rem"
+    fontWeight: 570
+    lineHeight: 1.25
+  summary-title:
+    fontSize: "1.2rem"
+    fontWeight: 650
+    lineHeight: 1.55
+  summary-body:
+    fontSize: "0.94rem"
+    fontWeight: 400
+    lineHeight: 1.9
+rounded:
+  control: "10px"
+  segment: "12px"
+  card: "14px"
+  summary-panel: "15px"
+  overview: "22px"
+  capsule: "999px"
+spacing:
+  workspace-inset: "clamp(20px, 2vw, 32px)"
+  panel-inset: "24px"
+  compact-inset: "16px"
+  section-gap: "24px"
+  control-gap: "8px"
+  summary-gap: "18px"
+components:
+  button-primary:
+    backgroundColor: "{colors.accent}"
+    textColor: "{colors.on-accent}"
+    typography: "{typography.control}"
+    rounded: "{rounded.control}"
+    padding: "7px 11px"
+  button-primary-hover:
+    backgroundColor: "{colors.accent-hover}"
+    textColor: "{colors.on-accent}"
+  button-companion:
+    backgroundColor: "{colors.surface-companion}"
+    textColor: "{colors.action-companion}"
+    rounded: "{rounded.control}"
+    padding: "7px 11px"
+  button-warm:
+    backgroundColor: "{colors.surface-warm}"
+    textColor: "{colors.action-warm}"
+    rounded: "{rounded.control}"
+    padding: "7px 11px"
+  button-positive:
+    textColor: "{colors.action-positive}"
+    rounded: "{rounded.control}"
+    padding: "7px 11px"
+  input-search:
+    backgroundColor: "{colors.surface-raised}"
+    textColor: "{colors.text-primary}"
+    rounded: "{rounded.segment}"
+    padding: "10px 12px"
+  nav-dock:
+    textColor: "{colors.text-secondary}"
+    rounded: "{rounded.capsule}"
+    padding: "6px"
+  chip-period:
+    backgroundColor: "{colors.surface-inset}"
+    textColor: "{colors.text-secondary}"
+    rounded: "{rounded.segment}"
+  card-raised:
+    backgroundColor: "{colors.surface-raised}"
+    textColor: "{colors.text-primary}"
+    rounded: "{rounded.card}"
+    padding: "{spacing.panel-inset}"
+  summary-panel:
+    textColor: "{colors.text-primary}"
+    rounded: "{rounded.summary-panel}"
+    padding: "24px"
+  calendar-day:
+    textColor: "{colors.text-primary}"
+    height: "54px"
+---
 
-应用使用 Electron、React、TypeScript、Zustand 和 SQLite。底部依次为研究计划、文献阅读、科研成果、论文投稿、设置；所有页面共用顶部每日科研鼓励语。
+# Design System: PhD 科研工作台 v0.8.19
 
-研究计划便签与科研成果书架的当前设计规范见 [研究手记与成果藏书](DESIGN-paper-studio.md)。该规范更新两个页面的内容展示，继续沿用下述数据与功能契约。
+## Overview
 
-## AI 计划与外观增量
+**Creative North Star: "几何研究手记"**
 
-研究计划快速添加栏提供持久化的 AI 识别开关。开启时才把输入交给 AI 识别日期、时间和项目；关闭时按当前日期上下文和所选项目直接创建标题任务，不发起 AI 请求。未配置且开启时打开助手配置并保留输入。全局助手入口位于右下角，与主面板右边缘及侧栏外观控件中心对齐。两类 API 配置和快速识别开关独立存入 `assistant.settings`；密钥用 Electron safeStorage 加密，渲染层仅返回是否保存。主进程发起 HTTPS / 本机 HTTP 请求，禁用重定向，不记录密钥或服务方错误响应正文。接口地址变化时不复用旧密钥。
+工作台使用“几何研究手记”：壁纸联动的低饱和玻璃外壳包围清晰的研究内容。光边、内暗边与外投影建立层级，抬高的正文表面承载长时间操作和阅读；系统字体与用户显示偏好决定实际密度。
 
-自然语言与本地日期、星期、时区、现有项目名称和 ID 发送给模型。模型返回新增计划、追问或不支持三种结构；只开放新增能力，不向模型提供任意 IPC、SQL 或文件工具。Zod 及既有日期/时间/项目校验通过后，同一 SQLite 事务写入所有任务及请求回执。回执持久化保留最近 200 次请求用于重试去重，不存原始输入。AI 与手动任务共用现有表和三个视图，没有复制三条任务。Today Plan 只筛选当天，其他日期在全部任务与日历中保留。
+v0.8.19 从当前代码提取规范，参考图用于玻璃材质方向。研究计划、文献阅读、科研成果、论文投稿、研究报表和设置共享同一外壳、颜色角色与几何节奏。v0.8.18 的悬浮胶囊 Dock 和四类批注继续保留；v0.8.17 的阅读器随手记入口、v0.8.14–0.8.15 的多主题描述属于历史实现，均不作为当前规范。
 
-透明度存入原 `interface.preferences` 的 `panelOpacity` 字段。读取旧设置时默认 75% 不透明度，保留背景路径和字号，不改写原始偏好。滑块反向显示 0–80% 透明度；CSS 只混合面板背景，取消主面板内重复实色层，不设置容器 opacity。文字和 PDF 阅读保持独立；减少透明度/高对比度系统设置使用不透明回退。侧栏删除“工作空间”并压缩顶部间距。
+**Key Characteristics:**
 
-## 研究计划
+- 壁纸决定强调色与表面色，辅助动作有稳定的阅读、AI 和完成语义。
+- 标题、工具栏与正文共享横向边距，宽屏和紧凑模式保持对齐。
+- 玻璃集中在外壳与操作层，正文、文字和 PDF 保持清晰。
+- 入场与译文就绪使用短提示，减少动态效果时跳过相应 timeline。
 
-项目只作为任务的归属与便签分组，不再作为独立页面或左侧导航层级。Today Plan、全部任务和日历统一汇总所有项目的安排；“全部任务”是项目任务的唯一总览，每个项目对应一张颜色不同的便签。快速新建栏同时提供项目选择与“新建项目”，创建后直接选中新项目；便签右上角保留项目重命名、配色、归档和安全删除入口。日/周视图沿用任务的项目颜色和标识；旧有无项目记录保持待归属。归档保留关联；删除有任务的项目时先转移任务。日期与分钟时间以本地 YYYY-MM-DD、HH:mm 保存，操作审计时间为 ISO UTC。
+## Colors
 
-## 文献、每日下载与成果
+前置令牌记录默认背景的浅色值；运行时以 `src/shared/palette.ts` 的 `interfacePalette` 为配色依据，深色值和角色映射见 `.impeccable/design.json`。十种内置背景及自定义壁纸分别派生表面、正文、强调色与光影，不把默认预览色固定到所有背景。
 
-普通文献、Arxiv Daily 和科研成果由 collection 明确区分，分别保存和计数。文件夹仅用于分类，使用 `parentId` 表达树结构；界面与 Repository 同时限制最多三级，避免仅靠界面隐藏造成越界数据。删除文件夹不删除文献。托管 PDF 使用 UUID 子目录，Daily 另按日期分层，原文和译文同目录。
+- **Primary — 壁纸强调色：**主要提交、中英摘要入口与 Dock 选中底板使用 accent / on-accent，悬停使用 accent-hover。
+- **Secondary — 伴随冷色：**阅读原文、日期调整和部分信息反馈成对使用 surface-companion / action-companion；自定义背景的伴随色由其色相派生。
+- **Tertiary — 温和暖色与完成绿：**AI、暂缓与需要处理的摘要状态使用 surface-warm / action-warm；完成操作与译文就绪图标使用 action-positive 与相应文字、淡底色。
+- **Neutral — 工作表面与光影：**surface-workspace 承载内容区，surface-raised 承载卡片，surface-inset 承载工具槽；三级正文色保留阅读层级。glass-highlight、glass-shade 和 shadow-ink 从同一背景配色派生。
 
-PDF.js 的 worker、字体、CMaps 和 WASM 随应用打包。阅读器支持原文/双语版、翻页、缩放、文字选择和独立页码记忆；阅读进度按最远位置计算。文字层样式限制在阅读器内。
+**The Semantic Action Rule.** 强调色用于主要动作；伴随冷色用于阅读与日期操作，暖色用于 AI 与暂缓，绿色用于完成。每个角色同时使用自己的表面色与文字色。
 
-导入文献和成果时读取 PDF 元数据及首页文字，再按设置通过 DOI 或高置信标题向 Crossref 查询。手动修改或清空的字段受保护，缺失与歧义允许手动处理；不执行 OCR，不推断期刊/JCR 分区或论文荣誉，不补造未知发表月日。期刊分区增加 EI、中文核心、大学学报，仍使用既有字段保存。论文荣誉由 migration 0004 的 JSON 文本列保存，旧论文默认为空；创建时默认值与局部更新校验分离，避免页数等无关更新覆盖荣誉。
+**The Paper and Ink Rule.** 壁纸与玻璃材质作用于工作台界面；PDF 正文保持原始色彩、字体和独立缩放。
 
-arXiv 请求和下载串行处理，按去版本号后的编号去重。请求优先走系统代理；遇到连接中断且确有代理时，由独立内存 session 尝试直连同一官方地址，成功路径按域名暂记 10 分钟。取消、HTTP 拒绝、限流及证书错误不触发回退，重试保留至少 3.1 秒请求间隔。Daily 和成果上传不自动全文翻译。普通文献沿用自动翻译设置，也可手动加入队列。
+## Typography
 
-## 翻译
+全界面沿用前置令牌中的系统字体栈，基础字号默认（14px），用户可选择（13／14／16／18px）。各层级用 rem 跟随设置；PDF 使用阅读器独立缩放。常规页面标题采用 title，全部任务的概览标题收为（1.75rem）；中英摘要弹窗标题为（1.5rem），正文标题和长摘要分别使用 summary-title 与 summary-body。数字数量使用等宽数字，长标题与摘要允许换行。
 
-文献卡片固定三个等宽入口：原文、已翻译或未翻译、中英摘要。取消单独的重复翻译状态行，运行中或失败状态仍在按钮与错误提示中显示。arXiv 封面和标题默认打开中英摘要：左右对照标题和完整摘要，窄窗口改为纵向，等待或失败时原文仍可读。通过既有独立 IPC 复用 AssistantService 的 Chat Completions 请求，只提供当前论文题目和原文摘要，严格解析两个中文字段。PaperOverviewService 使用既有 app_settings 保存按论文 ID 区分的缓存及原始摘要，以题目、摘要、PDF 哈希验证缓存有效性，并将缓存原文摘要一并返回界面；并发请求合并，失败不覆盖已有结果，响应返回后再次验证数据位置及元数据。删除文献同步清理该缓存，不新增数据库迁移。普通 PDF 的摘要提取只接受明确的 Abstract/摘要至 Keywords/Introduction 边界，缺失时允许手工粘贴原文摘要；不会把正文总结当摘要。
+## Layout
 
-通过自有进度适配脚本调用本机 PDF2zh Next 异步事件接口，为每项翻译提供独立配置及串行队列；Python 入口缺失时保留官方便携版 CLI 回退。首次使用不继承开发机绝对路径：翻译前先做健康检查，缺少引擎时保持论文原状态并打开设置。设置可下载固定版本的官方 with-assets 包，使用独立 Chromium 网络会话继承 Windows 代理，支持断点续传；SHA-256 通过后才在工作台程序数据目录内进行受限解压并切换配置。进度为运行期状态，通过预加载事件同步，最多约每 200ms 更新且保留最后一次进度，不逐次写数据库。准备阶段显示未知进度，百分比来自引擎，总体值单调且在结果校验前不超过 99。
+标题、正文和工具栏共用 workspace-inset；区块间距与面板内边距使用前置令牌，紧凑模式将面板内边距和区块间距收为 compact-inset。标题保持全宽，1920 宽屏与正文左缘对齐。18px 字号且展开侧栏时列宽为（248px）；文件夹行依次留出（14px）展开位、弹性名称位和两个（25px）操作位，数量独立保留（24px）并右对齐。
 
-文献页右上角的翻译设置提供 PDF2zh 公益免费服务、Gemini 2.5 Flash-Lite、OpenRouter 免费模型路由、SiliconFlow 自有额度四套预设，并可新增 OpenAI 兼容配置。当前启用项保存在 `app_settings`；API 密钥使用 Electron `safeStorage` 绑定当前 Windows 账户加密，渲染层和 IPC 快照只返回“是否已保存”，不返回明文。每项任务先复制外部模板，再关闭所有翻译服务、清除模板中其他服务的密钥并仅注入当前配置。外部模板不被改写，运行中的任务不受随后切换影响。
+中英摘要采用顶部状态、正文滚动区和页脚操作三层。两栏间距读取 summary-gap，弹窗宽度为 `min(1180px, calc(100vw - 64px))`，最大高度为 `calc(100dvh - 64px)`；1250px 以下收紧边距，820px 以下正文改为单栏，780px 以下窗口高度缩小外边距。项目卡片固定三条任务可见，更多任务在卡片内滚动。每日短句以窗口中心定位，宽度随内容与可用空间收缩，长句可打开全文；按压保持相同中心坐标。
 
-“免费”仅表示当前公益服务、免费层或零价格模型路由，额度和可用性可能变化。Gemini 官方免费层需要用户自己的密钥，中国大陆不在 Google 官方支持地区列表；OpenRouter 免费路由不保证固定模型。排版在本机，文本翻译需要联网。外部 Python 引擎不随安装包分发；文件存在和配置完整的健康检查不代表联网鉴权必然成功。不要启动会重置配置的旧 server.py。
+**The Shared Inset Rule.** 页面标题、工具栏与正文都读取同一个工作区边距；宽屏不再单独居中或缩进标题。
 
-## 投稿状态时间线
+## Elevation & Depth
 
-每条记录对应向一家期刊或会议的一次投稿，转投另建记录。状态改为记录内的有序节点，每个节点由用户填写名称和 YYYY-MM-DD 日期；首节点日期派生为投稿时间，末节点名称派生为当前状态。左侧按当前自定义状态动态筛选，顶部统计累计投稿、本月进展、返修截止和状态节点总数。
+玻璃由同色系光边、内暗边、斜向高光和外投影共同形成。侧栏与 Dock 使用透光外壳；主区域保持（90%）工作表面底色，内容卡片使用抬高表面。侧栏、主区域、Dock 的模糊分别为（26／24／30px），饱和度分别为（125／115／150%）；弹窗使用（20px）模糊和（92%）工具表面。精确阴影、背景混合与透明度回退记录在 sidecar extensions；增强对比度或减少透明度时外壳使用实色并取消模糊。
 
-时间线只渲染已有节点，不显示固定占位状态，也不推断持续天数。每个状态名称前使用不同颜色的实心圆点；顶部当前状态使用其对应节点的同色圆点。一个节点或空状态保持左对齐；时间线理想宽度随节点数增长，少量节点不横跨整张卡片，节点较多时限制在卡片宽度内并适当压缩间距。状态日期需按先后顺序，重名状态允许用于多轮流程。返修提醒仅由明确的截止日期和提醒开关控制，不从自由文本状态名称推断语义。
+**The Clear Content Rule.** 透明度调节周边面板，正文与卡片保留足够底色；文字和图标不随容器降低不透明度。
 
-## 保存位置与数据保护
+## Shapes
 
-本机四类托管数据统一位于 D:\Desktop\Phd Research\工作台数据，分别使用数据库、文献、科研成果、Arxiv Daily 子目录。系统配置目录保留数据库定位文件。数据库目录更改采用复制、校验、切换后清理的顺序；PDF 目录设置区分当前与历史根目录，读取路径必须精确匹配对应论文的托管路径。
+圆角按功能层级使用前置令牌：按钮用 control，分段槽用 segment，卡片用 card，摘要内容栏用 summary-panel，摘要弹窗用 overview，Dock 与每日短句用 capsule。玻璃边缘与卡片边缘采用细线；项目身份色继续作为任务卡片左缘标识，选中态使用颜色、轮廓和文本共同表达。
 
-本次整理合并了两处互补数据，保留业务字段、PDF 哈希及执行历史；整理依据保存在“工作台数据/整理与迁移记录.json”。
+## Components
 
-## 软件更新
+- **Buttons：**主要动作使用实色强调，辅助动作使用语义淡表面；悬停调整明暗，按压缩为（.975），禁用时取消缩放。键盘焦点保持（2px）明确轮廓。光影与完整状态样式见 sidecar 的可独立渲染片段。
+- **Cards / Inputs：**卡片以抬高表面和细光边承载正文；快速添加聚焦时增加强调色边与淡色外环。搜索、表单和设置保持真实输入、选择与自动保存路径。
+- **Navigation / Chips：**六个入口保持同一悬浮胶囊 Dock。选中底板平滑移动，窗口及字号改变后重新对齐；自动隐藏继续响应底缘鼠标与键盘焦点。分段选择使用内凹槽和抬高选中项。
+- **Planner：**快速录入处于主要层级，逾期待处理使用暖色区块，任务行保持清晰抬高表面；完成、改到今天、暂缓到明天保留各自语义颜色。入场 timeline 依次显示标题、录入和范围／逾期反馈（260ms，4–6px，power2.out）。
+- **Bilingual overview：**顶部显示读取、翻译、就绪、缺少原文或具体失败原因；英文和当前中文保留可读，长正文独立滚动。页脚提供阅读／关闭、重试／重译，失败时可打开 AI 设置。入场 timeline 为（280ms，4–7px，60ms 栏间错峰），译文就绪图标和文字分别为（240／320ms）。减少动态效果时跳过这些 timeline。
+- **Calendar / Reader：**报表保持真实来源明细和独立周期，日历用“法／休／班”标明已收录安排；调休上班日纳入研究目标。阅读器只保留重点、方法、证据、疑问四类纵向折叠批注，定位时短暂提亮原句。
 
-设置页通过 typed preload 暴露更新状态、准备更新、安装更新及状态事件四项固定能力，不向渲染层开放通用网络、文件或进程接口。UpdateService 只访问 `Lzy-shulab/Phd-Research-Table` 的 GitHub Latest Release API、同一仓库的 Latest Release 校验文件和 Release 下载地址；API 正常时只接受非草稿、非预发布的三段式版本，API 匿名额度受限时则从唯一匹配的 `SHA256SUMS.txt` 安装包条目恢复正式版本号。Release 页面和下载地址必须属于该固定仓库，标签、安装包文件名及其中的版本必须一致。生产请求使用专用 Electron session 的 Chromium 网络栈，以继承 Windows 系统代理、PAC 与系统证书策略，同时避开仅针对渲染页面的联网拦截；错误提示区分 DNS、超时、代理中断、证书、HTTP 拒绝及 GitHub 匿名访问频率限制。
+## Do's and Don'ts
 
-安装包以流式方式下载到系统临时目录，不进入数据库或 PDF 保存目录。下载过程同时计算 SHA-256，并核对 GitHub asset digest；旧发布未提供 digest 时仅接受同一 Release 的 `SHA256SUMS.txt`。文件大小或摘要不符时删除临时分片并停止，不启动安装器。校验成功后，用户再次点击才安装；渲染层先冲刷既有保存队列，主进程再拒绝文献下载或翻译期间的退出。独立 PowerShell 等待当前进程完全结束后打开 NSIS 安装包，避免安装器与运行中的程序争用文件；安装程序结束后删除下载包和辅助脚本，下次下载前也清理缓存中的旧版本安装包。
+### Do:
 
-更新服务不调用数据库 Repository、StoragePaths、InterfaceService 或 safeStorage，也不读取、迁移、覆盖或删除工作台数据。版本替换依赖 NSIS，数据库和用户 PDF 继续位于独立数据目录。开发环境可检查版本但不安装；0.7.2 是首次带此更新入口的版本，因此首次升级到 0.7.2 仍需手动安装。
+- **Do** 延续系统字体、用户字号、背景、透明度、深浅显示、密度、侧栏与 Dock 偏好。
+- **Do** 通过真实状态、图标和文字说明动作，配色作为辅助层级。
+- **Do** 保持摘要顶部反馈与页脚可见，让长正文在中间区域滚动。
+- **Do** 在重新翻译失败时保留当前译文，并提供具体原因、AI 设置与重试。
 
-## 视觉与每日鼓励
+### Don't:
 
-整体视觉采用“几何研究手记”语言：低饱和暖灰底色、圆与切角矩形等简化几何形态、纯 CSS 的细微干刷纹理，以及一层短而轻的阴影。边框、圆角和选中态保持克制，不用强烈玻璃拟态或多层高光。使用系统字体，默认基础字号 14px，提供 13、14、16、18 四档，保留明确的标题、正文和辅助信息层级；侧栏宽度和文献卡片列宽随字号调整。大字号周日历设置最小列宽并保留横向滚动，分钟时间的纵向几何不变。PDF 内容保持不透明且缩放独立。
-
-四种内置背景和 JPG/PNG 上传均使用固定背景层，切换短暂交叉淡入；上传图最长边缩至 2560px，保存应用独立副本，不修改原图。明亮图片在深色模式下增加遮罩，内容表面保留足够底色。选中态使用无回弹弹簧，按钮提供即时按压反馈，翻译条使用短缓动；减少动态效果时关闭背景淡入与不定进度流动。减少透明度、增强对比度和最小窗口有对应适配。外观单独保存在 app_settings 的 interface.preferences，不改变文献、任务、投稿、存储目录或数据库结构。
-
-页面切换、选中态和悬停采用 150–240ms 的短缓动，只做轻微位移或颜色变化；全局不使用回弹。系统“减少动态效果”开启时取消位移。每日鼓励语从一言公开句库动态读取筛选条目，同日固定，按本机零点更新。主进程负责后台定时，唤醒或重新打开补查；离线保留来源日期，首次无缓存使用明确标注的本地原创语句。点击可查看全文及来源信息。
+- **Don't** 在宽屏为标题增加独立的居中容器或额外左缩进。
+- **Don't** 将玻璃透光效果施加到 PDF 正文、文字或图标整体。
+- **Don't** 将已移除主题或阅读器随手记入口记录为当前功能。
+- **Don't** 将隔离界面成功状态视为真实外部 API 已成功连接。

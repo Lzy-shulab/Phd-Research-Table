@@ -1,0 +1,31 @@
+/* One palette reaches the canvas, content surfaces and native caption controls. */
+.titlebar { background: var(--chrome-color); }
+.daily-encouragement { flex: 1 1 870px; max-width: 870px; min-width: 0; opacity: 1; }
+.titlebar-context { margin-left: auto; }
+.wallpaper-orange { background: linear-gradient(135deg, #f8d6b6, #edbd93); }
+.wallpaper-yellow { background: linear-gradient(135deg, #f9e9af, #e5d292); }
+.wallpaper-red { background: linear-gradient(135deg, #e8b3a9, #d48d85); }
+.wallpaper-pink { background: linear-gradient(135deg, #f3d1e0, #ddb0c9); }
+[data-theme='dark'] .wallpaper-orange { background: linear-gradient(135deg, #553521, #2b211c); }
+[data-theme='dark'] .wallpaper-yellow { background: linear-gradient(135deg, #504321, #28271c); }
+[data-theme='dark'] .wallpaper-red { background: linear-gradient(135deg, #522b28, #2e1f20); }
+[data-theme='dark'] .wallpaper-pink { background: linear-gradient(135deg, #513047, #2a202a); }
+.paper-card-body { background: var(--surface-raised); }
+.paper-progress-footer { background: var(--surface-inset); }
+.dock-wrap::before, .dock-wrap::after {
+  clip-path: none;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1000 100' preserveAspectRatio='none'%3E%3Cpath d='M76 1H924Q936 1 942 13L997 88Q1004 99 988 99H12Q-4 99 3 88L58 13Q64 1 76 1Z'/%3E%3C/svg%3E") 0 0 / 100% 100% no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1000 100' preserveAspectRatio='none'%3E%3Cpath d='M76 1H924Q936 1 942 13L997 88Q1004 99 988 99H12Q-4 99 3 88L58 13Q64 1 76 1Z'/%3E%3C/svg%3E") 0 0 / 100% 100% no-repeat;
+}
+.dock-wrap::after { background: var(--surface-inset); }
+.arxiv-run-status { margin: 12px 0 22px; background: var(--surface-inset); border-radius: 12px; }
+.arxiv-candidate-preview { display: block; text-align: left; font: inherit; color: var(--text-primary); }
+.arxiv-candidate-preview:hover { color: var(--accent); }
+.arxiv-candidate-preview:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 4px; }
+.arxiv-candidate-list article { cursor: pointer; }
+.arxiv-preview-hint { color: var(--accent); font-size: 0.8rem; margin-left: auto; }
+.paper-overview-loading { padding: 10px 14px; margin: 14px 0; background: var(--surface-inset); border-radius: 10px; }
+@media (max-width: 1200px) { .daily-encouragement { max-width: 870px; } }
+@media (prefers-contrast: more), (prefers-reduced-transparency: reduce) {
+  .dock-wrap::after { backdrop-filter: none; }
+}

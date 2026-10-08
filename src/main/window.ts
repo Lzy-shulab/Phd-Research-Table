@@ -2,6 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, nativeTheme, screen } from 'electr
 import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
 import type { SettingsRepository } from './database/repositories/settings'
+import { interfacePalette } from '../shared/palette'
 
 export function createWindow(
   settings: () => SettingsRepository | undefined,
@@ -20,9 +21,13 @@ export function createWindow(
           saved.y >= a.y &&
           saved.y + 80 < a.y + a.height
       )
+  const requestedWidth = saved?.width ?? 1440
+  const requestedHeight = saved?.height ?? 940
+  const appearance = settings()?.getAppearance() ?? 'system'
+  const palette = interfacePalette(settings()?.getInterface().background ?? 'default', appearance === 'system' ? nativeTheme.shouldUseDarkColors : appearance === 'dark')
   const window = new BrowserWindow({
-    width: saved?.width ?? 1440,
-    height: saved?.height ?? 940,
+    width: requestedWidth,
+    height: requestedHeight,
     ...(visible ? { x: saved.x, y: saved.y } : {}),
     minWidth: 1100,
     minHeight: 700,
@@ -31,11 +36,11 @@ export function createWindow(
     icon: app.isPackaged
       ? join(process.resourcesPath, 'icon.png')
       : join(app.getAppPath(), 'resources/icon.png'),
-    backgroundColor: nativeTheme.shouldUseDarkColors ? '#171e26' : '#e7ecf0',
+    backgroundColor: palette.base,
     titleBarStyle: 'hidden',
     titleBarOverlay: {
-      color: nativeTheme.shouldUseDarkColors ? '#171e26' : '#e7ecf0',
-      symbolColor: nativeTheme.shouldUseDarkColors ? '#bec9d4' : '#4f5e6a',
+      color: palette.base,
+      symbolColor: palette.text,
       height: 40
     },
     webPreferences: {
@@ -47,17 +52,16 @@ export function createWindow(
       spellcheck: false
     }
   })
-  const updateTheme = () => {
-    if (window.isDestroyed()) return
-    const dark = nativeTheme.shouldUseDarkColors
-    window.setBackgroundColor(dark ? '#171e26' : '#e7ecf0')
-    if (process.platform === 'win32')
-      window.setTitleBarOverlay({
-        color: dark ? '#171e26' : '#e7ecf0',
-        symbolColor: dark ? '#bec9d4' : '#4f5e6a'
-      })
+  // On Windows with a hidden titlebar, BrowserWindow can add a few device-independent
+  // pixels to the requested outer size. Persisting that expanded size verbatim makes the
+  // window grow again on every launch, so retain the one-time frame correction.
+  const initialBounds = window.getNormalBounds()
+  const frameCorrection = {
+    width: Math.max(0, initialBounds.width - requestedWidth),
+    height: Math.max(0, initialBounds.height - requestedHeight)
   }
-  nativeTheme.on('updated', updateTheme)
+  // Renderer resolves the selected background, explicit theme and custom-image tint
+  // together, then synchronizes the fixed, validated window:palette capability.
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
   window.webContents.on('will-navigate', (event) => event.preventDefault())
   window.webContents.on('will-attach-webview', (event) => event.preventDefault())
@@ -68,6 +72,16 @@ export function createWindow(
   let allowClose = false
   let pendingToken: string | undefined
   let closeTimer: ReturnType<typeof setTimeout> | undefined
+  let pendingWindowState: ReturnType<SettingsRepository['getWindowState']>
+  const currentWindowState = () => {
+    const bounds = window.getNormalBounds()
+    return {
+      ...bounds,
+      width: Math.max(1100, bounds.width - frameCorrection.width),
+      height: Math.max(700, bounds.height - frameCorrection.height),
+      maximized: window.isMaximized()
+    }
+  }
   const flushResult = (event: Electron.IpcMainEvent, token: unknown, ok: unknown) => {
     if (
       event.sender !== window.webContents ||
@@ -83,11 +97,17 @@ export function createWindow(
     }
   }
   ipcMain.on('app:flush-result', flushResult)
+  window.once('ready-to-show', () => {
+    const readyBounds = window.getNormalBounds()
+    frameCorrection.width = Math.max(0, readyBounds.width - requestedWidth)
+    frameCorrection.height = Math.max(0, readyBounds.height - requestedHeight)
+  })
   window.on('close', (event) => {
     if (isBusy()) { event.preventDefault(); return }
     if (!allowClose && !window.webContents.isCrashed()) {
       event.preventDefault()
       if (pendingToken) return
+      pendingWindowState = currentWindowState()
       pendingToken = randomUUID()
       window.webContents.send('app:flush', pendingToken)
       closeTimer = setTimeout(() => {
@@ -101,14 +121,13 @@ export function createWindow(
       return
     }
     try {
-      settings()?.setWindowState({ ...window.getNormalBounds(), maximized: window.isMaximized() })
+      settings()?.setWindowState(pendingWindowState ?? currentWindowState())
     } catch (error) {
       console.error('Could not store window position', error)
     }
   })
   window.once('closed', () => {
     clearTimeout(closeTimer)
-    nativeTheme.removeListener('updated', updateTheme)
     ipcMain.removeListener('app:flush-result', flushResult)
   })
   if (rendererUrl) void window.loadURL(rendererUrl)

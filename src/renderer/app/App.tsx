@@ -1,5 +1,5 @@
 import { Component, lazy, Suspense, useEffect, type ErrorInfo, type ReactNode } from 'react'
-import { AnimatePresence } from 'motion/react'
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { AlertCircle, Orbit } from 'lucide-react'
 import { useWorkbench } from '../stores/workbench'
 import { useTasks } from '../hooks/use-tasks'
@@ -18,6 +18,7 @@ import { WorkspaceBackground } from '../components/layout/WorkspaceBackground'
 import { useInterface } from '../stores/interface'
 import { useAssistant } from '../stores/assistant'
 import { AssistantDialog } from '../components/planner/AssistantDialog'
+import { GlobalSearch } from '../components/layout/GlobalSearch'
 
 const LiteratureWorkspace = lazy(() =>
   import('../components/literature/LiteratureWorkspace').then((m) => ({
@@ -35,7 +36,15 @@ const SubmissionsWorkspace = lazy(() =>
     default: m.SubmissionsWorkspace
   }))
 )
+const ReportsWorkspace = lazy(() => import('../components/reports/ReportsWorkspace').then(m => ({ default: m.ReportsWorkspace })))
 
+async function flushWorkspace() {
+  if (useAssistant.getState().busy) {
+    useWorkbench.getState().notify('AI 正在处理计划，请等结果返回后再关闭。', 'info')
+    return false
+  }
+  return await useWorkbench.getState().flushAll() && await useInterface.getState().flush()
+}
 class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
   state = { failed: false }
   static getDerivedStateFromError() {
@@ -49,7 +58,8 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean
       <div className="startup-state">
         <AlertCircle size={26} />
         <h1>工作区暂时无法显示。</h1>
-        <p>已保存的数据未受影响，请重新启动应用。</p>
+        <p>已保存的数据未受影响。可以重新打开工作区，或正常关闭应用。</p>
+        <Button variant="primary" onClick={async () => { if (await flushWorkspace()) this.setState({ failed: false }) }}>重新打开工作区</Button>
       </div>
     ) : (
       this.props.children
@@ -66,6 +76,7 @@ function Workbench() {
   const projectId = useWorkbench((s) => s.projectId)
   const selectedTaskId = useWorkbench((s) => s.selectedTaskId)
   const tasks = useTasks()
+  const reducedMotion = useReducedMotion()
   useAppearance()
   useEffect(() => {
     void bootstrap()
@@ -100,18 +111,6 @@ function Workbench() {
     }
   }, [ready])
   useEffect(() => {
-    const off = window.workbench?.onBeforeClose(async () => {
-      if (useAssistant.getState().busy) {
-        useWorkbench.getState().notify('AI 正在处理计划，请等结果返回后再关闭。', 'info')
-        return false
-      }
-      if (!(await useWorkbench.getState().flushAll())) return false
-      if (!(await useInterface.getState().flush())) {
-        useWorkbench.getState().notify('背景正在保存，完成后再关闭。', 'info')
-        return false
-      }
-      return true
-    })
     const keyboard = (event: KeyboardEvent) => {
       if (event.isComposing) return
       const state = useWorkbench.getState()
@@ -126,7 +125,6 @@ function Workbench() {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault()
         window.dispatchEvent(new CustomEvent('workbench:command-palette-request'))
-        state.notify('命令面板尚未开放。按 Ctrl+N 可添加任务。', 'info')
       }
       if (event.key === 'Escape' && !document.querySelector('[role="dialog"]'))
         state.selectTask(null)
@@ -138,13 +136,34 @@ function Workbench() {
     window.addEventListener('keydown', modality)
     window.addEventListener('pointerdown', modality)
     return () => {
-      off?.()
       window.removeEventListener('keydown', keyboard)
       window.removeEventListener('keydown', modality)
       window.removeEventListener('pointerdown', modality)
     }
   }, [])
   const task = tasks.find((t) => t.id === selectedTaskId)
+  const workspaceKey = section === 'planner' ? `${section}-${view}-${projectId ?? 'all'}` : section
+  const workspace = section === 'planner' ? (
+    <PlannerWorkspace />
+  ) : section === 'literature' ? (
+    <Suspense fallback={<div className="startup-state">正在打开文献库…</div>}>
+      <LiteratureWorkspace />
+    </Suspense>
+  ) : section === 'outputs' ? (
+    <Suspense fallback={<div className="startup-state">正在打开科研成果…</div>}>
+      <OutputsWorkspace />
+    </Suspense>
+  ) : section === 'submissions' ? (
+    <Suspense fallback={<div className="startup-state">正在打开投稿记录…</div>}>
+      <SubmissionsWorkspace />
+    </Suspense>
+  ) : section === 'reports' ? (
+    <Suspense fallback={<div className="startup-state">正在打开研究报表…</div>}><ReportsWorkspace /></Suspense>
+  ) : (
+    <Suspense fallback={<div className="startup-state">正在打开设置…</div>}>
+      <SettingsWorkspace />
+    </Suspense>
+  )
   return (
     <div className="app-shell">
       <WorkspaceBackground />
@@ -170,33 +189,25 @@ function Workbench() {
           <Sidebar />
           <MetadataQueue />
           <div className="main-region">
-            {section === 'planner' ? (
-              <>
-                <PlannerWorkspace key={`${view}-${projectId}`} />
-                <AnimatePresence initial={false}>
-                  {task && <TaskInspector key="task-inspector" task={task} />}
-                </AnimatePresence>
-              </>
-            ) : section === 'literature' ? (
-              <Suspense fallback={<div className="startup-state">正在打开文献库…</div>}>
-                <LiteratureWorkspace />
-              </Suspense>
-            ) : section === 'outputs' ? (
-              <Suspense fallback={<div className="startup-state">正在打开科研成果…</div>}>
-                <OutputsWorkspace />
-              </Suspense>
-            ) : section === 'submissions' ? (
-              <Suspense fallback={<div className="startup-state">正在打开投稿记录…</div>}>
-                <SubmissionsWorkspace />
-              </Suspense>
-            ) : (
-              <Suspense fallback={<div className="startup-state">正在打开设置…</div>}>
-                <SettingsWorkspace />
-              </Suspense>
-            )}
+            <AnimatePresence initial={false} mode="wait">
+              <motion.div
+                className="workspace-stage"
+                key={workspaceKey}
+                initial={{ opacity: 0, y: reducedMotion ? 0 : 7 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: reducedMotion ? 0 : -4 }}
+                transition={{ duration: reducedMotion ? 0 : 0.18, ease: [0.22, 1, 0.36, 1] }}
+              >
+                {workspace}
+              </motion.div>
+            </AnimatePresence>
+            <AnimatePresence initial={false}>
+              {section === 'planner' && task && <TaskInspector key="task-inspector" task={task} />}
+            </AnimatePresence>
           </div>
           <Dock />
           <AssistantDialog />
+          <GlobalSearch />
         </>
       )}
       <Toasts />
@@ -204,6 +215,8 @@ function Workbench() {
   )
 }
 export function App() {
+  // Keep the close handshake mounted even when a workspace fails to render.
+  useEffect(() => window.workbench.onBeforeClose(flushWorkspace), [])
   return (
     <ErrorBoundary>
       <Workbench />

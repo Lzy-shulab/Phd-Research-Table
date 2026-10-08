@@ -21,7 +21,7 @@ async function launch() {
   page = await app.firstWindow()
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].hide())
   page.on('pageerror', (error) => errors.push(error.message))
-  await page.getByRole('heading', { name: 'Today Plan', exact: true }).waitFor()
+  await page.getByRole('heading', { name: '今日计划', exact: true }).waitFor()
 }
 const unwrap = (result) => { assert.equal(result.ok, true, JSON.stringify(result)); return result.data }
 const snapshot = async () => unwrap(await page.evaluate(() => window.workbench.librarySnapshot()))

@@ -10,7 +10,7 @@ try {
   const page = await app.firstWindow()
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].hide())
   page.on('pageerror', (error) => console.error('RENDERER ERROR', error.message))
-  await page.getByRole('heading', { name: 'Today Plan', exact: true }).waitFor()
+  await page.getByRole('heading', { name: '今日计划', exact: true }).waitFor()
   await page.getByRole('button', { name: '浅色模式' }).click()
   await page.waitForFunction(() => document.documentElement.dataset.theme === 'light')
   await page.screenshot({ path: resolve(resultDir, 'today-light.png'), animations: 'disabled' })

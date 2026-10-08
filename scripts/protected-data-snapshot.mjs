@@ -16,7 +16,15 @@ try {
   const names = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all().map((row) => row.name)
   const tables = names.map((name) => {
     const rows = db.prepare(`SELECT * FROM "${name.replaceAll('"', '""')}"`).all()
-    return { name, rows: rows.length, sha256: digest(JSON.stringify(rows.map((row) => JSON.stringify(row)).sort())) }
+    const columns = db.prepare(`PRAGMA table_info("${name.replaceAll('"', '""')}")`).all().map((column) => column.name)
+    const legacyRows = name === 'papers'
+      ? rows.map((row) => Object.fromEntries(Object.entries(row).filter(([key]) => key !== 'highlights')))
+      : rows
+    return {
+      name, rows: rows.length, columns,
+      sha256: digest(JSON.stringify(rows.map((row) => JSON.stringify(row)).sort())),
+      legacySha256: digest(JSON.stringify(legacyRows.map((row) => JSON.stringify(row)).sort()))
+    }
   })
   const appSettings = db.prepare('SELECT key,value FROM app_settings ORDER BY key').all()
     .map(({ key, value }) => ({ key, sha256: digest(value) }))

@@ -37,7 +37,12 @@ const taskFields = {
   scheduledDate: calendarDate,
   startTime: localTime,
   endTime: localTime,
-  estimatedMinutes: z.number().int().min(1).max(100000).nullable()
+  estimatedMinutes: z.number().int().min(1).max(100000).nullable(),
+  deferredUntil: calendarDate,
+  checklist: z.array(z.object({ id: idSchema, text: z.string().trim().min(1).max(500), completed: z.boolean() }).strict()).max(100),
+  milestone: z.string().max(500),
+  linkedPaperId: idSchema.nullable(),
+  linkedSubmissionId: idSchema.nullable()
 }
 export const taskCreateSchema = z
   .object({
@@ -45,9 +50,24 @@ export const taskCreateSchema = z
     projectId: taskFields.projectId.optional(),
     scheduledDate: calendarDate.optional(),
     startTime: localTime.optional(),
-    endTime: localTime.optional()
+    endTime: localTime.optional(),
+    description: taskFields.description.optional(),
+    priority: taskFields.priority.optional(),
+    dueDate: taskFields.dueDate.optional(),
+    estimatedMinutes: taskFields.estimatedMinutes.optional(),
+    checklist: taskFields.checklist.optional(),
+    milestone: taskFields.milestone.optional(),
+    linkedPaperId: taskFields.linkedPaperId.optional(),
+    linkedSubmissionId: taskFields.linkedSubmissionId.optional(),
+    sourceType: z.enum(['manual', 'paper', 'submission', 'template']).optional(),
+    sourceId: idSchema.nullable().optional()
   })
   .strict()
+export const taskSeriesSchema = taskCreateSchema.extend({
+  scheduledDate: z.string().refine(isCalendarDate, '重复任务需要有效的首次日期。'),
+  recurrence: z.literal('weekly'),
+  occurrences: z.number().int().min(2).max(52)
+}).strict()
 export const taskPatchSchema = z.object(taskFields).partial().strict()
 export const projectCreateSchema = z
   .object({

@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { LibrarySnapshot, PaperVariant, Result, TranslationProgress } from '../../shared/types'
 import { useWorkbench } from './workbench'
-import { defaultArxivSettings } from '../../shared/arxiv'
+import { ARXIV_LIBRARY_FOLDER, defaultArxivSettings } from '../../shared/arxiv'
 
 interface LibraryState extends LibrarySnapshot {
   loaded: boolean
@@ -10,20 +10,20 @@ interface LibraryState extends LibrarySnapshot {
   outputYear: string
   outputJournal: string
   filterOutputs: (year: string, journal: string) => void
-  reader: { id: string; variant: PaperVariant } | null
+  reader: { id: string; variant: PaperVariant; page?: number; highlightId?: string } | null
   load: () => Promise<void>
   selectFolder: (id: string) => void
-  openPaper: (id: string, variant?: PaperVariant) => void
+  openPaper: (id: string, variant?: PaperVariant, page?: number, highlightId?: string) => void
   closeReader: () => void
   setTranslationProgress: (progress: TranslationProgress | null) => void
 }
 let revision = 0
 let progressRevision = 0
 export const useLibrary = create<LibraryState>((set) => ({
-  folders: [], papers: [], autoTranslate: true, metadataOnline: true, metadataAutomatic: true, serverDirectory: '', loaded: false, loadError: '',
+  folders: [], papers: [], autoTranslate: true, metadataOnline: true, metadataAutomatic: true, serverDirectory: '', translationPaused: false, loaded: false, loadError: '',
   translationProgress: null,
   setTranslationProgress: (translationProgress) => { progressRevision++; set({ translationProgress }) },
-  arxiv: { settings: defaultArxivSettings, running: false, progress: '', runs: [], directory: '' },
+  arxiv: { settings: defaultArxivSettings, running: false, progress: '', runs: [], directory: '', candidates: [], downloads: [], preparation: { pending: 0, failed: 0, ready: 0, error: '' } },
   outputYear: 'all', outputJournal: 'all', filterOutputs: (outputYear, outputJournal) => set({ outputYear, outputJournal }),
   folderId: 'all', reader: null,
   load: async () => {
@@ -35,11 +35,11 @@ export const useLibrary = create<LibraryState>((set) => ({
       if (!result.ok) { set({ loadError: result.error.message }); return }
       set((state) => ({ ...result.data, loaded: true, loadError: '',
         translationProgress: progressRequest === progressRevision ? result.data.translationProgress : state.translationProgress,
-        folderId: ['all', 'unfiled', 'arxiv'].includes(state.folderId) || result.data.folders.some((f) => f.id === state.folderId) ? state.folderId : 'all' }))
+        folderId: ['all', 'unfiled', 'arxiv', ARXIV_LIBRARY_FOLDER].includes(state.folderId) || result.data.folders.some((f) => f.id === state.folderId) ? state.folderId : 'all' }))
     } catch { set({ loadError: '文献库暂时无法读取，请重试。' }) }
   },
   selectFolder: (folderId) => set({ folderId }),
-  openPaper: (id, variant = 'source') => set({ reader: { id, variant } }),
+  openPaper: (id, variant = 'source', page, highlightId) => set({ reader: { id, variant, page, highlightId } }),
   closeReader: () => set({ reader: null })
 }))
 

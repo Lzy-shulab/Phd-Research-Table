@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
 import {
   Bell,
@@ -18,6 +18,7 @@ import { useSubmissions } from '../../stores/submissions'
 import { useClock } from '../../hooks/use-clock'
 import { Button } from '../ui/button'
 import { SubmissionDialog } from './SubmissionDialog'
+import { useWorkbench } from '../../stores/workbench'
 
 function stageDateLabel(date: string, today: string) {
   const [year, month, day] = date.split('-').map(Number)
@@ -32,15 +33,19 @@ function stageColor(index: number) {
 function SubmissionCard({
   submission,
   today,
-  edit
+  edit,
+  createPublication
 }: {
   submission: Submission
   today: string
   edit: () => void
+  createPublication: () => void
 }) {
   const reduced = useReducedMotion()
-  const due = submission.revisionDueDate ? daysUntil(submission.revisionDueDate, today) : null
+  const due = submission.revisionDueDate && !submission.revisionCompleted && !submission.ended ? daysUntil(submission.revisionDueDate, today) : null
   const count = submission.stages.length
+  const latestDate = submission.stages.at(-1)?.occurredOn
+  const elapsed = latestDate ? daysUntil(today, latestDate) : null
   const timelineStyle = { '--stage-count': Math.max(1, count) } as CSSProperties
   return (
     <motion.article
@@ -58,9 +63,16 @@ function SubmissionCard({
           {count > 0 && <i className="submission-status-dot" aria-hidden="true" />}
           {submission.currentStage || '暂无状态'}
         </span>
+        {(submission.ended || submission.revisionCompleted) && <span className="submission-closed-badge">{submission.ended ? '投稿已结束' : '本轮返修已完成'}</span>}
         <span className="submission-journal" title={submission.journal}>
           <BookOpenText size={14} />
           <span>{submission.journal}</span>
+        </span>
+        <span className={`submission-status-age ${elapsed === null ? 'is-empty' : ''}`} title={latestDate ? `最新状态日期：${latestDate}` : '尚无状态日期'}>
+          <Clock3 size={15} aria-hidden="true" />
+          {elapsed === null ? <span>暂无状态日期</span> : elapsed < 0
+            ? <><span>状态日期在</span><strong>{-elapsed}</strong><span>天后</span></>
+            : <><span>最新状态距今：</span><strong>{elapsed}</strong><span>天</span></>}
         </span>
         <Button variant="ghost" onClick={edit} aria-label={`更新投稿 ${submission.title}`}>
           更新进展
@@ -149,7 +161,7 @@ function SubmissionCard({
           <ListChecks size={13} />
           阶段记录 · {count}
         </span>
-        {submission.revisionDueDate && (
+        {submission.revisionDueDate && !submission.revisionCompleted && !submission.ended && (
           <span>
             <Bell size={12} />
             {submission.reminderEnabled
@@ -157,6 +169,7 @@ function SubmissionCard({
               : '未开启到期提醒'}
           </span>
         )}
+        {submission.ended && <button onClick={createPublication}>带入信息登记成果</button>}
       </div>
     </motion.article>
   )
@@ -166,6 +179,15 @@ export function SubmissionsWorkspace() {
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState('updated')
   const [editing, setEditing] = useState<Submission | 'new' | null>(null)
+  useEffect(() => {
+    const openRecord = (event: Event) => {
+      const id = (event as CustomEvent<string>).detail
+      const found = useSubmissions.getState().submissions.find((item) => item.id === id)
+      if (found) setEditing(found)
+    }
+    window.addEventListener('workbench:open-submission-record', openRecord)
+    return () => window.removeEventListener('workbench:open-submission-record', openRecord)
+  }, [])
   const today = localDay(useClock())
   const reminders = state.submissions.filter((item) => revisionReminder(item, today))
   const cards = state.submissions
@@ -201,7 +223,7 @@ export function SubmissionsWorkspace() {
     },
     {
       label: '返修截止',
-      value: state.submissions.filter((item) => item.revisionDueDate).length,
+      value: state.submissions.filter((item) => item.revisionDueDate && !item.revisionCompleted && !item.ended).length,
       unit: '项',
       icon: CalendarClock
     },
@@ -294,6 +316,10 @@ export function SubmissionsWorkspace() {
                 submission={submission}
                 today={today}
                 edit={() => setEditing(submission)}
+                createPublication={() => {
+                  useWorkbench.getState().setSection('outputs')
+                  requestAnimationFrame(() => window.dispatchEvent(new CustomEvent('workbench:create-publication-from-submission', { detail: { sourceSubmissionId: submission.id, values: { title: submission.title, journal: submission.journal, notes: `来源投稿：${submission.journal}${submission.manuscriptId ? ` · ${submission.manuscriptId}` : ''}` } } })))
+                }}
               />
             ))}
           </div>
@@ -303,13 +329,10 @@ export function SubmissionsWorkspace() {
               <Send size={27} strokeWidth={1.4} />
             </div>
             <h2>
-              {state.submissions.length ? '这个范围还没有投稿记录。' : '从一篇正在投稿的论文开始。'}
+              {state.submissions.length ? '没有匹配的投稿记录' : '从一篇正在投稿的论文开始。'}
             </h2>
-            <p>期刊、审稿进展与返修期限，都可以记录在这里。</p>
-            <Button onClick={() => setEditing('new')}>
-              <Plus size={15} />
-              新增投稿
-            </Button>
+            <p>{state.submissions.length ? '清除搜索和阶段筛选，即可恢复完整列表。' : '期刊、审稿进展与返修期限，都可以记录在这里。'}</p>
+            {state.submissions.length ? <Button onClick={() => { setQuery(''); state.setScope(null) }}>清除搜索和筛选</Button> : <Button onClick={() => setEditing('new')}><Plus size={15} />新增投稿</Button>}
           </div>
         )}
         <p className="submission-footnote">

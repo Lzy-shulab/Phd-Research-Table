@@ -4,21 +4,29 @@ import { journalPartitions, type Paper, type PublicationInput, type PublicationM
 import { publicationSchema } from '../../../domain/research'
 import { mergePublicationMetadata, publicationMetadataKeys } from '../../../domain/publication-metadata'
 import { useLibrary, libraryAction } from '../../stores/library'
+import { useWorkbench } from '../../stores/workbench'
 import { openPdf, openPdfBytes } from '../../lib/pdf'
 import { readPdfMetadata } from '../../lib/metadata'
 import { Button } from '../ui/button'
 import { ConfirmDialog, Dialog } from '../ui/dialog'
 import { publicationHonorDetails } from './publication-honors'
+import { clearDraft, readDraft, writeDraft } from '../../lib/drafts'
+import { DraftCloseDialog } from '../ui/DraftCloseDialog'
 
-export function PublicationDialog({ paper, onClose }: { paper?: Paper; onClose: () => void }) {
-  const [draft, setDraft] = useState<PublicationInput>({ title: paper?.title ?? '', authors: paper?.authors ?? '', journal: paper?.journal ?? '',
-    publishedDate: paper?.publishedDate ?? '', doi: paper?.doi ?? '', casPartition: paper?.casPartition ?? '', jcrQuartile: paper?.jcrQuartile ?? '', honors: paper?.honors ?? [], notes: paper?.notes ?? '' })
+export function PublicationDialog({ paper, seed, sourceSubmissionId, onClose }: { paper?: Paper; seed?: Partial<PublicationInput>; sourceSubmissionId?: string; onClose: () => void }) {
+  const draftKey = `publication.${paper?.id ?? 'new'}`
+  const initialDraft = useRef<PublicationInput>({ title: paper?.title ?? seed?.title ?? '', authors: paper?.authors ?? seed?.authors ?? '', journal: paper?.journal ?? seed?.journal ?? '',
+    publishedDate: paper?.publishedDate ?? seed?.publishedDate ?? '', doi: paper?.doi ?? seed?.doi ?? '', casPartition: paper?.casPartition ?? seed?.casPartition ?? '', jcrQuartile: paper?.jcrQuartile ?? seed?.jcrQuartile ?? '', honors: paper?.honors ?? seed?.honors ?? [], notes: paper?.notes ?? seed?.notes ?? '',
+    authorRole: paper?.authorRole ?? '', coFirstAuthor: paper?.coFirstAuthor ?? false, correspondingAuthor: paper?.correspondingAuthor ?? false,
+    partitionYear: paper?.partitionYear ?? '', tags: paper?.tags ?? [] })
+  const [draft, setDraft] = useState<PublicationInput>(() => readDraft<PublicationInput>(draftKey)?.value ?? initialDraft.current)
   const [path, setPath] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [remove, setRemove] = useState(false)
   const [identifying, setIdentifying] = useState(false)
   const [phase, setPhase] = useState('')
+  const [closePrompt, setClosePrompt] = useState(false)
   const [identified, setIdentified] = useState<Pick<PublicationMetadataPreview, 'source' | 'message' | 'status'> | null>(null)
   const [datePrecision, setDatePrecision] = useState(() => paper?.publishedDate.length === 4 ? 'year' : paper?.publishedDate.length === 7 ? 'month' : 'day')
   const metadataOnline = useLibrary((state) => state.metadataOnline)
@@ -27,6 +35,9 @@ export function PublicationDialog({ paper, onClose }: { paper?: Paper; onClose: 
   const initialPaper = useRef(paper)
   const draftRef = useRef(draft)
   draftRef.current = draft
+  const dirty = JSON.stringify(draft) !== JSON.stringify(initialDraft.current) || !!path
+  useEffect(() => { if (dirty) writeDraft(draftKey, draft) }, [draft, draftKey, dirty])
+  const requestClose = () => { if (busy || identifying) return; if (dirty) setClosePrompt(true); else onClose() }
   const touched = useRef<Set<keyof PublicationInput>>(new Set(paper ? publicationMetadataKeys.filter((key) => !!paper[key]) : []))
   useEffect(() => {
     const requestGeneration = generation
@@ -79,6 +90,14 @@ export function PublicationDialog({ paper, onClose }: { paper?: Paper; onClose: 
       if (!result.data) return
       generation.current++; setIdentifying(false); setIdentified(null)
       setPath(result.data)
+      if (paper && !paper.sourcePath) {
+        const attached = await window.workbench.attachPublicationPdf(paper.id, result.data)
+        if (!attached.ok) { setError(attached.error.message); return }
+        await useLibrary.getState().load()
+        setError(''); setPath('');
+        useWorkbench.getState().notify('PDF 已补充到原成果记录。', 'info')
+        return
+      }
       const filename = (result.data.split(/[\\/]/).pop() ?? '').replace(/\.pdf$/i, '')
       setDraft((previous) => {
         const next = { ...previous }
@@ -89,25 +108,26 @@ export function PublicationDialog({ paper, onClose }: { paper?: Paper; onClose: 
     } catch { setError('无法选择 PDF，请重试。') } finally { setBusy(false) }
   }
   return <>
-    <Dialog open className="publication-dialog" title={paper ? '编辑科研成果' : '添加已发表成果'} description="选中 PDF 后自动识别文章资料，核对发表信息后保存。"
-      onOpenChange={(open) => { if (!open && !busy) onClose() }}>
+    <Dialog open className="publication-dialog" title={paper ? '编辑科研成果' : '添加已发表成果'} description="可先填写 DOI 或发表信息，PDF 可以现在选择，也可以保存后再补充。"
+      onOpenChange={(open) => { if (!open) requestClose() }}>
       <form className="project-form" onSubmit={async (event) => {
         event.preventDefault(); if (busy || identifying) return
         const parsed = publicationSchema.safeParse(draft)
         if (!parsed.success) { setError(parsed.error.issues[0]?.message ?? '请检查发表信息。'); return }
-        if (!paper && !path) { setError('请先选择成果 PDF。'); return }
         setBusy(true); setError('')
         try {
-          const result = paper ? await window.workbench.updatePaper(paper.id, parsed.data) : await window.workbench.createPublication(path, parsed.data)
+          const result = paper ? await window.workbench.updatePaper(paper.id, parsed.data) : await window.workbench.createPublication(path || null, parsed.data)
           if (!result.ok) { setError(result.error.message); return }
+          if (!paper && sourceSubmissionId) await window.workbench.updatePaper(result.data.id, { linkedSubmissionId: sourceSubmissionId })
           await useLibrary.getState().load()
           if (!paper) useLibrary.getState().filterOutputs('all', 'all')
+          clearDraft(draftKey)
           onClose()
         } catch { setError('成果未能保存，请检查文件后重试。') } finally { setBusy(false) }
       }}>
-        <div className="publication-pdf-input"><FileText size={24} /><span><strong>{paper ? paper.originalName : path ? path.split(/[\\/]/).pop() : '选择已发表论文的 PDF'}</strong><small>原文件保留 · 副本保存在本机</small></span>
-          {!paper && <Button onClick={() => void pick()} disabled={busy}><Upload size={14} />{path ? '重新选择' : '选择 PDF'}</Button>}</div>
-        {(paper || path) && <div className={`publication-recognition ${identified?.status === 'partial' ? 'is-partial' : ''}`} role="status" aria-live="polite">
+        <div className="publication-pdf-input"><FileText size={24} /><span><strong>{paper?.originalName || (path ? path.split(/[\\/]/).pop() : '尚未关联 PDF')}</strong><small>{paper?.sourcePath || path ? '原文件保留 · 副本保存在本机' : '可以只保存成果信息，稍后补充 PDF'}</small></span>
+          {(!paper || !paper.sourcePath) && <Button onClick={() => void pick()} disabled={busy}><Upload size={14} />{paper ? '补充 PDF' : path ? '重新选择' : '选择 PDF（可选）'}</Button>}</div>
+        {((paper?.sourcePath) || path) && <div className={`publication-recognition ${identified?.status === 'partial' ? 'is-partial' : ''}`} role="status" aria-live="polite">
           <div>{identifying ? <span className="tiny-spinner" /> : <ScanText size={16} />}<span><strong>{identifying ? phase : identified ? identified.source : '文章资料自动识别'}</strong>
             <small>{identifying ? '可继续核对或修改字段，你的修改会保留。' : identified?.message || (metadataOnline ? '使用 PDF 及公开书目补全缺失信息，不上传 PDF 全文。' : '联网补全已关闭，将只读取 PDF 资料。')}</small></span></div>
           {identifying ? <Button variant="ghost" onClick={() => { generation.current++; setIdentifying(false); setIdentified({ status: 'partial', source: '手动填写', message: '已结束等待，保留已读取的资料。' }) }}>手动填写</Button>
@@ -124,6 +144,9 @@ export function PublicationDialog({ paper, onClose }: { paper?: Paper; onClose: 
         <p className="field-hint publication-date-hint">只有年份或月份时，可按实际精度保存，无需补填具体月日。</p>
         <div className="field-pair"><label className="field">期刊分区<select aria-label="期刊分区" value={draft.casPartition} onChange={(e) => update('casPartition', e.target.value)}><option value="">暂未填写</option>{journalPartitions.map((value) => <option key={value}>{value}</option>)}</select></label>
           <label className="field">JCR 分区<select aria-label="JCR 分区" value={draft.jcrQuartile} onChange={(e) => update('jcrQuartile', e.target.value)}><option value="">暂未填写</option>{['Q1', 'Q2', 'Q3', 'Q4', '非SCI'].map((value) => <option key={value}>{value}</option>)}</select></label></div>
+        <div className="field-pair"><label className="field">分区年份<input inputMode="numeric" maxLength={4} placeholder="例如 2026" value={draft.partitionYear ?? ''} onChange={(e) => setDraft((current) => ({ ...current, partitionYear: e.target.value }))} /></label>
+          <label className="field">作者身份<input maxLength={200} placeholder="例如 第一作者、导师通讯" value={draft.authorRole ?? ''} onChange={(e) => setDraft((current) => ({ ...current, authorRole: e.target.value }))} /></label></div>
+        <div className="publication-author-flags"><label><input type="checkbox" checked={draft.coFirstAuthor ?? false} onChange={(e) => setDraft((current) => ({ ...current, coFirstAuthor: e.target.checked }))} />共同一作</label><label><input type="checkbox" checked={draft.correspondingAuthor ?? false} onChange={(e) => setDraft((current) => ({ ...current, correspondingAuthor: e.target.checked }))} />通讯作者</label></div>
         <fieldset className="publication-honors-field"><legend>论文荣誉 <span>可多选</span></legend>
           <div className="publication-honor-options" role="group" aria-label="论文荣誉">{publicationHonorDetails.map(({ id, label, icon: Icon }) => {
             const selected = draft.honors.includes(id)
@@ -134,12 +157,14 @@ export function PublicationDialog({ paper, onClose }: { paper?: Paper; onClose: 
           <p className="field-hint">荣誉信息由你确认，不根据期刊或引用数据自动推断。</p>
         </fieldset>
         <label className="field">DOI<input maxLength={500} placeholder="10.xxxx/… 或 DOI 链接，可留空" value={draft.doi} onChange={(e) => update('doi', e.target.value)} /></label>
+        <label className="field">主题标签<input maxLength={1000} placeholder="多个标签用逗号分隔" value={(draft.tags ?? []).join(', ')} onChange={(e) => setDraft((current) => ({ ...current, tags: e.target.value.split(/[,，]/).map((value) => value.trim()).filter(Boolean).slice(0, 30) }))} /></label>
         <label className="field">成果备注<textarea aria-label="成果备注" rows={2} maxLength={50000} placeholder="可记录分区年份、作者贡献或研究亮点" value={draft.notes} onChange={(e) => update('notes', e.target.value)} /></label>
         {error && <p role="alert" className="field-error">{error}</p>}
         <div className="dialog-actions">{paper && <Button variant="ghost" className="danger-text push-right" disabled={busy} onClick={() => setRemove(true)}><Trash2 size={15} />移除成果</Button>}
-          <Button onClick={onClose} disabled={busy}>取消</Button><Button variant="primary" type="submit" disabled={busy || identifying}>{busy ? '保存中…' : identifying ? '识别中…' : '保存成果'}</Button></div>
+          <Button onClick={requestClose} disabled={busy}>取消</Button><Button variant="primary" type="submit" disabled={busy || identifying}>{busy ? '保存中…' : identifying ? '识别中…' : '保存成果'}</Button></div>
       </form>
     </Dialog>
+    <DraftCloseDialog open={closePrompt} onContinue={() => setClosePrompt(false)} onKeep={() => { writeDraft(draftKey, draft); setClosePrompt(false); onClose() }} onDiscard={() => { clearDraft(draftKey); setClosePrompt(false); onClose() }} />
     {paper && <ConfirmDialog open={remove} title="移除这项成果？" description="成果信息将移除，托管 PDF 副本会进入回收站；上传前的原始文件保留。" busy={busy} onClose={() => setRemove(false)} onConfirm={async () => {
       setBusy(true)
       try { const result = await window.workbench.deletePaper(paper.id); await libraryAction(Promise.resolve(result)); if (result.ok) onClose() }

@@ -17,7 +17,7 @@ try {
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].hide())
   page.on('pageerror', (error) => errors.push(error.message))
   page.on('console', (msg) => { if (msg.type() === 'error') console.log('CONSOLE', msg.text().slice(0, 400)) })
-  await page.getByRole('heading', { name: 'Today Plan', exact: true }).waitFor()
+  await page.getByRole('heading', { name: '今日计划', exact: true }).waitFor()
   await page.getByRole('button', { name: '浅色模式' }).click()
   await page.getByRole('navigation', { name: '科研工作空间' }).getByRole('button', { name: '文献阅读' }).click()
   await page.getByRole('heading', { name: '文献库', exact: true }).waitFor()

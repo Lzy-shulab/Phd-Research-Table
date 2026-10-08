@@ -1,4 +1,7 @@
 export const translationProviders = ['siliconflowfree', 'gemini', 'siliconflow', 'openai-compatible'] as const
+export function isHybridQwen3(model: string) {
+  return /^(?:Pro\/)?Qwen\/Qwen3-(?:0\.6|1\.7|4|8|14|32|30|235)B(?:-A(?:3|22)B)?$/i.test(model)
+}
 
 export type TranslationProvider = (typeof translationProviders)[number]
 

@@ -46,7 +46,7 @@ async function launch() {
   page = await app.firstWindow()
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].hide())
   page.on('pageerror', (error) => errors.push(error.message))
-  await page.getByRole('heading', { name: 'Today Plan', exact: true }).waitFor()
+  await page.getByRole('heading', { name: '今日计划', exact: true }).waitFor()
 }
 const section = (name) =>
   page
@@ -112,7 +112,7 @@ try {
   fixtureDb.prepare('UPDATE tasks SET project_id = NULL WHERE id = ?').run(fixtures.tasks[3].id)
   fixtureDb.close()
   await page.reload()
-  await page.getByRole('heading', { name: 'Today Plan', exact: true }).waitFor()
+  await page.getByRole('heading', { name: '今日计划', exact: true }).waitFor()
   await page
     .getByRole('navigation', { name: '研究计划视图' })
     .getByRole('button', { name: /^全部任务/ })

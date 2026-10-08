@@ -22,7 +22,7 @@ try {
   page = await app.firstWindow()
   await app.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows()[0].hide(); BrowserWindow.getAllWindows()[0].setBounds({ width: 1440, height: 950 }) })
   page.on('pageerror', (error) => errors.push(error.message))
-  await page.getByRole('heading', { name: 'Today Plan', exact: true }).waitFor()
+  await page.getByRole('heading', { name: '今日计划', exact: true }).waitFor()
   await page.evaluate(() => { window.__progressEvents = []; window.workbench.onTranslationProgress((progress) => { if (progress) window.__progressEvents.push(progress) }) })
   await page.getByRole('navigation', { name: '科研工作空间' }).getByRole('button', { name: '文献阅读', exact: true }).click()
   const imported = await page.evaluate((source) => window.workbench.importPapers([source], null, true), source)

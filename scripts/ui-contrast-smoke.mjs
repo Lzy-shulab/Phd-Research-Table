@@ -1,8 +1,7 @@
 import assert from 'node:assert/strict'
 import { _electron as electron } from 'playwright'
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { basename, join, resolve } from 'node:path'
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { join, resolve } from 'node:path'
 
 const executablePath = process.env.WORKBENCH_TEST_EXECUTABLE
 const evidence = resolve(
@@ -10,8 +9,8 @@ const evidence = resolve(
   executablePath ? 'ui-contrast-packaged' : 'ui-contrast'
 )
 mkdirSync(evidence, { recursive: true })
-const tempRoot = realpathSync(tmpdir())
-const profile = mkdtempSync(join(tempRoot, 'workbench-ui-contrast-'))
+const profile = join(evidence, `profile-${Date.now()}`)
+mkdirSync(profile, { recursive: true })
 const env = {
   ...process.env,
   WORKBENCH_DATA_DIR: profile,
@@ -86,7 +85,7 @@ try {
   page = await app.firstWindow()
   page.setDefaultTimeout(60_000)
   page.on('pageerror', (error) => errors.push(error.message))
-  await page.getByRole('heading', { name: 'Today Plan', exact: true }).waitFor()
+  await page.getByRole('heading', { name: '今日计划', exact: true }).waitFor()
 
   const project = unwrap(
     await page.evaluate(() =>
@@ -135,7 +134,7 @@ try {
   )
   unwrap(await page.evaluate(() => window.workbench.setAppearance('dark')))
   await page.reload()
-  await page.getByRole('heading', { name: 'Today Plan', exact: true }).waitFor()
+  await page.getByRole('heading', { name: '今日计划', exact: true }).waitFor()
   await page
     .getByRole('navigation', { name: '研究计划视图' })
     .getByRole('button', { name: /^全部任务/ })
@@ -156,14 +155,11 @@ try {
   await setWindowSize(2048, 1104)
   const desktop = await inspectLayout()
   assert.equal(desktop.tasks.count, 2)
-  assert.ok(desktop.tasks.gap >= 7.5 && desktop.tasks.gap <= 8.5, JSON.stringify(desktop.tasks))
+  assert.ok(desktop.tasks.gap >= 0.5 && desktop.tasks.gap <= 1.5, JSON.stringify(desktop.tasks))
   assert.ok(Number.parseFloat(desktop.tasks.borderWidth) >= 0.75, desktop.tasks.borderWidth)
   assert.equal(desktop.tasks.borderStyle, 'solid')
-  assert.notEqual(desktop.encouragement.background, 'rgba(0, 0, 0, 0)')
-  assert.ok(
-    Number.parseFloat(desktop.encouragement.borderWidth) >= 0.75,
-    desktop.encouragement.borderWidth
-  )
+  assert.equal(desktop.encouragement.background, 'rgba(0, 0, 0, 0)')
+  assert.ok(Number.parseFloat(desktop.encouragement.borderWidth) >= 0.75, desktop.encouragement.borderWidth)
   assert.match(desktop.encouragement.backdropFilter, /blur\(12px\)/)
   assert.ok(desktop.encouragement.left >= desktop.titlebar.left)
   assert.ok(desktop.encouragement.right <= desktop.titlebar.right)
@@ -191,8 +187,8 @@ try {
     JSON.stringify(
       {
         checks: [
-          'Daily encouragement has an independent non-transparent blurred surface on a strong wallpaper.',
-          'Task cards have a one-pixel full border and an eight-pixel inter-card gap.',
+          'Daily encouragement stays visually quiet while preserving a local blur on a strong wallpaper.',
+          'Task rows keep a one-pixel full border and a compact one-pixel inter-row gap.',
           'The titlebar and document remain within the viewport at 2048x1104 and the minimum window size.',
           'The encouragement dialog and task inspector still open and close from the updated controls.'
         ],
@@ -217,8 +213,4 @@ try {
   throw error
 } finally {
   if (app) await app.close().catch(() => undefined)
-  const target = realpathSync(profile)
-  if (target.startsWith(`${tempRoot}\\`) && basename(target).startsWith('workbench-ui-contrast-')) {
-    rmSync(target, { recursive: true, force: true })
-  }
 }

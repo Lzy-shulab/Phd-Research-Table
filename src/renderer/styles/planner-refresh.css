@@ -1,0 +1,185 @@
+/* Global modules use a narrow rail; the adjacent sidebar belongs to the current module. */
+.app-shell {
+  grid-template-columns: 66px clamp(210px, 15vw, 250px) minmax(0, 1fr);
+  grid-template-rows: 40px minmax(0, 1fr);
+  gap: 0 10px;
+}
+.dock-wrap {
+  grid-column: 1;
+  grid-row: 2;
+  align-self: stretch;
+  margin: 8px 0 12px 10px;
+  padding: 8px 3px;
+  border: 1px solid var(--border-default);
+  border-radius: 17px;
+  background: var(--glass-sidebar);
+  min-width: 0;
+}
+.dock {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 5px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+.dock-item {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 100%;
+  min-width: 0;
+  min-height: 58px;
+  padding: 9px 2px;
+  font-size: 0.68rem;
+  line-height: 1.15;
+  text-align: center;
+}
+.dock-item svg { flex-shrink: 0; }
+.dock-selection { border-radius: 10px; }
+.sidebar {
+  grid-column: 2;
+  grid-row: 2;
+  margin: 8px 0 12px;
+}
+.main-region {
+  grid-column: 3;
+  grid-row: 2;
+  margin: 8px 16px 12px 0;
+}
+:root[data-sidebar='collapsed'] .app-shell { grid-template-columns: 66px 0 minmax(0, 1fr); }
+:root[data-sidebar='collapsed'] .main-region { grid-column: 3; margin-left: 0; }
+:root[data-density='compact'] .app-shell { grid-template-rows: 36px minmax(0, 1fr); }
+
+.daily-encouragement {
+  max-width: min(380px, 32vw);
+  flex: 0 1 380px;
+  border-color: var(--border-subtle);
+  background: color-mix(in srgb, var(--surface-solid) 90%, transparent);
+  box-shadow: none;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+.daily-encouragement:hover { background: var(--surface-hover); }
+.daily-encouragement-text { font-weight: 400; }
+.assistant-launcher {
+  left: 17px;
+  right: auto;
+  bottom: 27px;
+  width: 42px;
+  height: 42px;
+  justify-content: center;
+  padding: 0;
+  border-radius: 11px;
+}
+.assistant-launcher > span { display: none; }
+
+.mini-calendar-hint {
+  margin: 0 2px 7px;
+  color: var(--text-secondary);
+  font-size: 0.73rem;
+}
+.mini-day.is-today { background: var(--accent-soft); }
+.mini-day.is-selected { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.mini-day.outside { opacity: 0.75; }
+
+.quick-capture { position: relative; flex-wrap: wrap; gap: 9px; }
+.quick-capture > input[aria-label='添加一个研究任务'] { flex: 1 1 210px; min-width: 160px; }
+.capture-more { position: relative; flex: 0 0 auto; }
+.capture-more > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 7px 5px;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  white-space: nowrap;
+  cursor: pointer;
+  list-style: none;
+}
+.capture-more > summary::-webkit-details-marker { display: none; }
+.capture-more > summary:hover, .capture-more[open] > summary { color: var(--accent); background: var(--accent-soft); }
+.capture-more-controls {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 8px);
+  right: 0;
+  display: grid;
+  justify-items: start;
+  gap: 9px;
+  min-width: 288px;
+  padding: 15px;
+  border: 1px solid var(--border-elevated);
+  border-radius: 11px;
+  background: var(--surface-solid);
+  box-shadow: var(--shadow-floating);
+}
+.capture-more-controls p { color: var(--text-secondary); font-size: 0.78rem; line-height: 1.5; }
+.capture-more-controls .capture-repeat input { flex: none; }
+.capture-more-controls .capture-ai-toggle { width: 100%; justify-content: space-between; font-size: 0.78rem; }
+.capture-more-controls .capture-template { width: 100%; max-width: none; }
+.capture-context { color: var(--text-secondary); }
+
+.today-scope-summary { margin: 14px 0 0; flex-wrap: wrap; gap: 7px; }
+.today-scope-summary span { padding: 5px 9px; background: var(--surface-secondary); border-color: var(--border-subtle); font-size: 0.8rem; }
+.today-scope-summary strong { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.today-empty { min-height: 210px; padding: 24px; }
+.today-empty-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 9px; }
+.today-empty-actions .button { margin-top: 18px; }
+.today-task-section { margin-top: 8px; }
+.today-task-section .section-heading h2 { font-size: 1rem; color: var(--text-primary); }
+.planner-workspace .list-toolbar { min-height: 0; padding: 12px 0 10px; }
+.planner-workspace .list-controls { margin-left: auto; }
+.today-collapsible { margin: 15px 0; padding: 10px 12px; border-top: 1px solid var(--border-default); color: var(--text-secondary); }
+.today-collapsible > summary { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.86rem; }
+.today-collapsible > summary::before { content: '▸'; color: var(--text-secondary); }
+.today-collapsible[open] > summary::before { content: '▾'; }
+.today-collapsible > summary strong { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.today-collapsible > summary span { margin-left: auto; font-size: 0.78rem; }
+.today-collapsible .task-list { margin-top: 11px; }
+
+.plan-note, [data-theme='dark'] .plan-note {
+  --note-ink: var(--text-primary);
+  --note-muted: var(--text-secondary);
+  background: color-mix(in srgb, var(--surface-solid) 95%, var(--project-color) 5%);
+  color: var(--text-primary);
+  border: 1px solid var(--border-default);
+  border-left: 3px solid var(--project-color);
+}
+.plan-note-empty { color: var(--text-secondary); }
+
+@media (max-width: 1250px) {
+  .app-shell { grid-template-columns: 62px 215px minmax(0, 1fr); }
+  :root[data-sidebar='collapsed'] .app-shell { grid-template-columns: 62px 0 minmax(0, 1fr); }
+  .dock-wrap { margin-left: 7px; }
+  .assistant-launcher { left: 14px; }
+  .daily-encouragement { max-width: 240px; }
+  .quick-capture > input[aria-label='添加一个研究任务'] { flex-basis: calc(100% - 34px); }
+  .planner-workspace .workspace-header { padding-top: 13px; padding-bottom: 11px; }
+  .planner-workspace .workspace-breadcrumb { padding-bottom: 8px; }
+  .planner-workspace .heading-line h1 { font-size: 1.65rem; }
+  .planner-workspace .quick-capture { padding: 7px 10px; gap: 5px 9px; }
+  .planner-workspace .overdue-panel { margin: 0 0 9px; }
+  .planner-workspace .overdue-heading { padding: 5px 10px; }
+  .planner-workspace .overdue-heading p { display: none; }
+  .planner-workspace .overdue-row { flex-direction: row; align-items: center; padding: 5px 10px; }
+  .planner-workspace .overdue-actions { width: auto; justify-content: flex-end; }
+  .planner-workspace .today-scope-summary { margin-top: 8px; }
+}
+@media (max-width: 950px) {
+  .planner-workspace .overdue-row { flex-direction: column; align-items: flex-start; }
+  .planner-workspace .overdue-actions { width: 100%; justify-content: flex-start; }
+}
+@media (max-width: 900px) {
+  .app-shell { grid-template-columns: 56px 190px minmax(0, 1fr); gap: 0 7px; }
+  :root[data-sidebar='collapsed'] .app-shell { grid-template-columns: 56px 0 minmax(0, 1fr); }
+  .dock-item { font-size: 0.62rem; }
+  .assistant-launcher { left: 11px; }
+  .daily-encouragement { display: none; }
+}

@@ -17,7 +17,7 @@ try {
   app = await electron.launch(executablePath ? { executablePath: resolve(executablePath), args: [], env } : { args: ['.'], env })
   page = await app.firstWindow()
   page.on('pageerror', (error) => errors.push(error.message))
-  await page.getByRole('heading', { name: 'Today Plan', exact: true }).waitFor()
+  await page.getByRole('heading', { name: '今日计划', exact: true }).waitFor()
   if (!live) await app.evaluate(() => {
       globalThis.fetch = async (input) => {
         const url = String(input)

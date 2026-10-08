@@ -1,7 +1,10 @@
 import type { ArxivSettings } from './types'
 
+export const ARXIV_LIBRARY_FOLDER = 'arxiv-library'
+
 export const defaultArxivSettings: ArxivSettings = {
   enabled: true, daysBack: 14, maxPerDay: 5,
+  excludedKeywords: [],
   directions: [
     'hyperspectral image', 'hyperspectral remote sensing', 'hyperspectral reconstruction',
     'hyperspectral fusion', 'hyperspectral super-resolution', 'hyperspectral denoising',
@@ -14,6 +17,9 @@ export const defaultArxivSettings: ArxivSettings = {
 export const paperMetadataDefaults = {
   collection: 'library' as const, arxivId: null, abstract: '', doi: '', publishedDate: '',
   collectedDate: '', casPartition: '', jcrQuartile: '', honors: [], readProgress: 0,
+  maxReadPage: 0, readingStatus: 'unread' as const, tags: [], excerpts: [], highlights: [], authorRole: '',
+  coFirstAuthor: false, correspondingAuthor: false, partitionYear: '', matchReason: '',
+  arxivFavorite: false, arxivIgnored: false, linkedSubmissionId: null, translationOrder: 0,
   metadataStatus: 'pending' as const, metadataSource: '', metadataMessage: '', metadataCheckedAt: null, metadataLockedFields: '[]'
 }
 export function localDay(date = new Date()) {

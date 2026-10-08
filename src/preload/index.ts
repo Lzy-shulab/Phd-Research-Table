@@ -3,6 +3,18 @@ import type { WorkbenchApi } from '../shared/types'
 
 // The renderer gets a fixed capability list, never ipcRenderer or a generic invoke.
 const api: WorkbenchApi = {
+  saveCheckin: (input, id) => ipcRenderer.invoke('reports:checkin-save', input, id),
+  deleteCheckin: id => ipcRenderer.invoke('reports:checkin-delete', id),
+  researchReport: () => ipcRenderer.invoke('reports:snapshot'),
+  saveReportSettings: input => ipcRenderer.invoke('reports:settings', input),
+  saveStipend: (input, id) => ipcRenderer.invoke('reports:stipend-save', input, id),
+  deleteStipend: id => ipcRenderer.invoke('reports:stipend-delete', id),
+  saveReadingDate: input => ipcRenderer.invoke('reports:reading-date', input),
+  countdowns: () => ipcRenderer.invoke('countdowns:list'),
+  saveCountdown: (input, id) => ipcRenderer.invoke('countdown:save', input, id),
+  deleteCountdown: (id) => ipcRenderer.invoke('countdown:delete', id),
+  setWindowPalette: (palette) => ipcRenderer.invoke('window:palette', palette),
+  generateArxivOverview: (input) => ipcRenderer.invoke('arxiv:overview', input),
   updateSnapshot: () => ipcRenderer.invoke('update:snapshot'),
   prepareUpdate: () => ipcRenderer.invoke('update:prepare'),
   installUpdate: () => ipcRenderer.invoke('update:install'),
@@ -41,10 +53,14 @@ const api: WorkbenchApi = {
   runArxivDaily: () => ipcRenderer.invoke('arxiv:run'),
   cancelArxivDaily: () => ipcRenderer.invoke('arxiv:cancel'),
   revealArxivDirectory: () => ipcRenderer.invoke('arxiv:directory'),
+  arxivCandidateAction: (id, action) => ipcRenderer.invoke('arxiv:candidate-action', id, action),
+  retryArxivTranslations: () => ipcRenderer.invoke('arxiv:translations-retry'),
   pickPublicationPdf: () => ipcRenderer.invoke('publication:pick'),
   readPublicationPdf: (path) => ipcRenderer.invoke('publication:read-selected', path),
   previewPublicationMetadata: (input, overrides) => ipcRenderer.invoke('publication:metadata-preview', input, overrides),
   createPublication: (path, metadata) => ipcRenderer.invoke('publication:create', path, metadata),
+  attachPublicationPdf: (id, path) => ipcRenderer.invoke('publication:attach', id, path),
+  exportPublications: (format, ids) => ipcRenderer.invoke('publication:export', format, ids),
   librarySnapshot: () => ipcRenderer.invoke('library:snapshot'),
   onLibraryChanged: (handler) => {
     const listener = () => handler()
@@ -65,6 +81,9 @@ const api: WorkbenchApi = {
   updatePaper: (id, patch) => ipcRenderer.invoke('library:paper-update', id, patch),
   deletePaper: (id) => ipcRenderer.invoke('library:paper-delete', id),
   retryTranslation: (id) => ipcRenderer.invoke('library:retry', id),
+  cancelTranslation: (id) => ipcRenderer.invoke('library:translation-cancel', id),
+  setTranslationPaused: (paused) => ipcRenderer.invoke('library:translation-pause', paused),
+  reorderTranslations: (ids) => ipcRenderer.invoke('library:translation-reorder', ids),
   readPaper: (id, variant) => ipcRenderer.invoke('library:read', id, variant),
   exportPaper: (id, variant) => ipcRenderer.invoke('library:export', id, variant),
   translationHealth: () => ipcRenderer.invoke('library:health'),
@@ -89,13 +108,19 @@ const api: WorkbenchApi = {
   },
   bootstrap: () => ipcRenderer.invoke('workbench:bootstrap'),
   createTask: (input) => ipcRenderer.invoke('task:create', input),
+  createTaskSeries: (input) => ipcRenderer.invoke('task:series-create', input),
+  updateTaskSeries: (seriesId, fromDate, patch) => ipcRenderer.invoke('task:series-update', seriesId, fromDate, patch),
   updateTask: (id, patch) => ipcRenderer.invoke('task:update', id, patch),
   completeTask: (id, completed) => ipcRenderer.invoke('task:complete', id, completed),
   deleteTask: (id) => ipcRenderer.invoke('task:delete', id),
   reorderTasks: (ids) => ipcRenderer.invoke('task:reorder', ids),
+  taskTemplates: () => ipcRenderer.invoke('task:templates'),
+  saveTaskTemplate: (template) => ipcRenderer.invoke('task:template-save', template),
+  deleteTaskTemplate: (id) => ipcRenderer.invoke('task:template-delete', id),
   createProject: (input) => ipcRenderer.invoke('project:create', input),
   updateProject: (id, patch) => ipcRenderer.invoke('project:update', id, patch),
-  deleteProject: (id, moveToId) => ipcRenderer.invoke('project:delete', id, moveToId),
-  setAppearance: (appearance) => ipcRenderer.invoke('settings:appearance', appearance)
+  deleteProject: (id, moveToId, taskAction) => ipcRenderer.invoke('project:delete', id, moveToId, taskAction),
+  setAppearance: (appearance) => ipcRenderer.invoke('settings:appearance', appearance),
+  reuseAssistantForTranslation: () => ipcRenderer.invoke('settings:reuse-assistant-translation')
 }
 contextBridge.exposeInMainWorld('workbench', api)

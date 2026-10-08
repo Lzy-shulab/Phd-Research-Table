@@ -19,7 +19,10 @@ export class SubmissionRepository {
       id: row.id, title: row.title, journal: row.journal, manuscriptId: row.manuscriptId,
       stages: own, submittedDate: own[0]?.occurredOn ?? null, currentStage: own.at(-1)?.name ?? '',
       revisionDueDate: row.revisionDueDate, reminderEnabled: row.reminderEnabled,
-      reminderDays: row.reminderDays, notes: row.notes, createdAt: row.createdAt, updatedAt: row.updatedAt
+      reminderDays: row.reminderDays, notes: row.notes, createdAt: row.createdAt, updatedAt: row.updatedAt,
+      revisionCompleted: row.revisionCompleted, ended: row.ended, projectId: row.projectId,
+      manuscriptPaperId: row.manuscriptPaperId, manuscriptGroupId: row.manuscriptGroupId || row.id,
+      sourceSubmissionId: row.sourceSubmissionId, reviewItems: row.reviewItems
     }
   }
   list() {
@@ -39,6 +42,13 @@ export class SubmissionRepository {
     const { stages, ...details } = parsed
     const submission = {
       ...details, id, submittedDate: stages[0]?.occurredOn ?? null,
+      revisionCompleted: details.revisionCompleted ?? false,
+      ended: details.ended ?? false,
+      projectId: details.projectId ?? null,
+      manuscriptPaperId: details.manuscriptPaperId ?? null,
+      manuscriptGroupId: details.manuscriptGroupId ?? id,
+      sourceSubmissionId: details.sourceSubmissionId ?? null,
+      reviewItems: details.reviewItems ?? [],
       status: stages.length ? 'submitted' as const : 'draft' as const, createdAt: now, updatedAt: now
     }
     this.db.transaction((tx) => {
@@ -73,6 +83,14 @@ export class SubmissionRepository {
       }
     })
     return this.get(id)
+  }
+  syncLinkedTask(taskId: string, completed: boolean) {
+    const now = new Date().toISOString()
+    for (const item of this.list()) {
+      if (!item.reviewItems.some((review) => review.taskId === taskId && review.completed !== completed)) continue
+      const reviewItems = item.reviewItems.map((review) => review.taskId === taskId ? { ...review, completed } : review)
+      this.db.update(submissions).set({ reviewItems, updatedAt: now }).where(eq(submissions.id, item.id)).run()
+    }
   }
   delete(id: string) { this.get(id); this.db.delete(submissions).where(eq(submissions.id, id)).run() }
 }

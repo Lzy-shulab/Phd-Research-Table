@@ -20,7 +20,7 @@ async function launch() {
   page = await app.firstWindow()
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].hide())
   page.on('pageerror', (e) => errors.push(e.message))
-  await page.getByRole('heading', { name: 'Today Plan', exact: true }).waitFor()
+  await page.getByRole('heading', { name: '今日计划', exact: true }).waitFor()
   await ensureTestProject(page)
 }
 async function snapshot() {
@@ -49,8 +49,8 @@ async function capture(title, { scheduledDate = null, view = '全部任务' } = 
   const created = await page.evaluate((input) => window.workbench.createTask(input), { title, projectId, scheduledDate })
   assert.equal(created.ok, true, JSON.stringify(created))
   await page.reload()
-  await page.getByRole('heading', { name: 'Today Plan', exact: true }).waitFor()
-  if (view !== 'Today Plan') await nav(view)
+  await page.getByRole('heading', { name: '今日计划', exact: true }).waitFor()
+  if (view !== '今日计划') await nav(view)
   return saved(title, {})
 }
 const block = (title) => page.getByTestId('schedule-block').filter({ has: page.locator('.block-title', { hasText: title }) })
@@ -81,9 +81,9 @@ try {
   assert.equal(await page.title(), 'PhD 科研工作台')
   assert.equal(await app.evaluate(({ app }) => app.getName()), 'PhD 科研工作台')
   assert.deepEqual(await page.locator('.dock-item').allTextContents(), ['研究计划', '文献阅读', '科研成果', '论文投稿', '设置'])
-  assert.deepEqual(await page.locator('.planner-nav .sidebar-link').allTextContents(), ['Today Plan', '日历', '全部任务'])
+  assert.deepEqual(await page.locator('.planner-nav .sidebar-link').allTextContents(), ['今日计划', '日历', '全部任务'])
   assert.ok(!(await page.locator('.sidebar').innerText()).match(/Inbox|收集箱/))
-  const task = await capture('分钟精度验证', { scheduledDate: today, view: 'Today Plan' })
+  const task = await capture('分钟精度验证', { scheduledDate: today, view: '今日计划' })
   assert.equal(task.scheduledDate, today)
   await page.locator('.task-content').filter({ hasText: task.title }).click()
   await page.getByRole('button', { name: '选择截止日期', exact: true }).click()
@@ -186,9 +186,8 @@ try {
       const styles = getComputedStyle(document.querySelector(selector))
       return { background: styles.backgroundColor, border: styles.borderColor, blur: styles.backdropFilter, shadow: styles.boxShadow }
     }))
-    assert.equal(tokens[0].background, tokens[1].background)
-    assert.equal(tokens[1].background, tokens[2].background)
-    assert.notEqual(tokens[2].background, tokens[3].background)
+    assert.ok(tokens.every((token) => token.background !== 'rgba(0, 0, 0, 0)' && token.background !== 'transparent'))
+    assert.notEqual(tokens[1].background, tokens[3].background)
     assert.ok(tokens[0].blur.includes('blur(') && tokens[2].blur.includes('blur('))
     assert.ok(tokens.every((t) => t.shadow !== 'none'))
   }

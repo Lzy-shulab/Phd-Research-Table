@@ -48,5 +48,7 @@ export class SettingsRepository {
   setAssistant(value: unknown): void { this.write('assistant.settings', value) }
   getAssistantReceipts(): unknown { return this.read('assistant.receipts') }
   setAssistantReceipts(value: unknown): void { this.write('assistant.receipts', value) }
+  getTaskTemplates(): unknown { return this.read('planner.templates') }
+  setTaskTemplates(value: unknown): void { this.write('planner.templates', value) }
   setEncouragement(value: unknown): void { this.write('daily.encouragement', value) }
 }

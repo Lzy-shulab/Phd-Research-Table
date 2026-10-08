@@ -39,6 +39,7 @@ export function ScheduleGrid({
   const [slot, setSlot] = useState<{ date: string; start: number | null; end: number | null } | null>(null)
   const [title, setTitle] = useState('')
   const [busy, setBusy] = useState(false)
+  const [expandedAnytime, setExpandedAnytime] = useState<Set<string>>(() => new Set())
   const openSlot = (value: ScheduleSlot) => { if (canCreate) { setTitle(''); setChosenProject(''); setSlot(value) } }
   const { begin, preview } = useScheduleGesture(openSlot)
   const previewTask = preview?.task ? {
@@ -82,9 +83,11 @@ export function ScheduleGrid({
               ))}
               <div className="anytime-axis">未指定时间</div>
               {dates.map((date) => (
-                <div key={dateKey(date)} className="calendar-anytime">
+                <div key={dateKey(date)} className={cn('calendar-anytime', expandedAnytime.has(dateKey(date)) && 'is-expanded')}>
+                  <div className="anytime-items">
                   {tasks
                     .filter((t) => t.scheduledDate === dateKey(date) && !t.startTime)
+                    .slice(0, expandedAnytime.has(dateKey(date)) ? undefined : 3)
                     .map((t) => {
                       const p = projects.find((p) => p.id === t.projectId)
                       return (
@@ -98,6 +101,12 @@ export function ScheduleGrid({
                         </button>
                       )
                     })}
+                  </div>
+                  {tasks.filter((t) => t.scheduledDate === dateKey(date) && !t.startTime).length > 3 && <button className="anytime-more" onClick={() => setExpandedAnytime((current) => {
+                    const next = new Set(current), key = dateKey(date)
+                    if (next.has(key)) next.delete(key); else next.add(key)
+                    return next
+                  })}>{expandedAnytime.has(dateKey(date)) ? '收起' : `还有 ${tasks.filter((t) => t.scheduledDate === dateKey(date) && !t.startTime).length - 3} 项`}</button>}
                   <button
                     className="anytime-add"
                     aria-label={`为 ${calendarLabel(dateKey(date))} 添加未指定时间的任务`}

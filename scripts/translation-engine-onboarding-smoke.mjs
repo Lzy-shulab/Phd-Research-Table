@@ -23,7 +23,7 @@ try {
   const page = await app.firstWindow()
   page.on('pageerror', (error) => errors.push(error.message))
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setBounds({ width: 1440, height: 980 }))
-  await page.getByRole('heading', { name: 'Today Plan', exact: true }).waitFor()
+  await page.getByRole('heading', { name: '今日计划', exact: true }).waitFor()
   await page.getByRole('navigation', { name: '科研工作空间' }).getByRole('button', { name: '文献阅读', exact: true }).click()
 
   const imported = await page.evaluate((path) => window.workbench.importPapers([path], null, false), resolve('tests/fixtures/translation-check.pdf'))

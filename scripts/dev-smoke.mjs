@@ -37,7 +37,7 @@ try {
   const page = browser.contexts()[0].pages()[0]
   const errors = []
   page.on('pageerror', (error) => errors.push(error.message))
-  await page.getByRole('heading', { name: 'Today Plan', exact: true }).waitFor({ timeout: 60000 })
+  await page.getByRole('heading', { name: '今日计划', exact: true }).waitFor({ timeout: 60000 })
   const result = await page.evaluate(() => window.workbench.bootstrap())
   assert.equal(result.ok, true)
   assert.equal(result.data.tasks.length, 0)

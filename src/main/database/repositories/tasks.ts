@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto'
-import { eq, asc, max } from 'drizzle-orm'
+import { eq, asc, sql } from 'drizzle-orm'
 import { projects, tasks } from '../schema'
 import type { WorkbenchDatabase } from '../db'
-import type { Task, TaskCreate, TaskPatch } from '../../../shared/types'
+import type { Task, TaskCreate, TaskPatch, TaskSeriesInput } from '../../../shared/types'
 import { DomainError } from '../../../domain/errors'
 import { validateSchedule } from '../../../domain/validation'
 
@@ -38,18 +38,50 @@ export class TaskRepository {
       startTime: input.startTime ?? null,
       endTime: input.endTime ?? null,
       estimatedMinutes: null,
-      order:
-        (this.db
-          .select({ value: max(tasks.order) })
-          .from(tasks)
-          .get()?.value ?? -1) + 1,
+      deferredUntil: null,
+      seriesId: null,
+      recurrence: null,
+      occurrenceDate: null,
+      checklist: input.checklist ?? [],
+      milestone: input.milestone ?? '',
+      linkedPaperId: input.linkedPaperId ?? null,
+      linkedSubmissionId: input.linkedSubmissionId ?? null,
+      sourceType: input.sourceType ?? 'manual',
+      sourceId: input.sourceId ?? null,
+      order: 0,
       createdAt: now,
       updatedAt: now,
       completedAt: null
     }
+    task.description = input.description ?? ''
+    task.priority = input.priority ?? 'none'
+    task.dueDate = input.dueDate ?? null
+    task.estimatedMinutes = input.estimatedMinutes ?? null
     validateSchedule(task)
-    this.db.insert(tasks).values(task).run()
+    this.db.transaction((tx) => {
+      tx.update(tasks).set({ order: sql<number>`${tasks.order} + 1` }).run()
+      tx.insert(tasks).values(task).run()
+    })
     return task
+  }
+  createSeries(input: TaskSeriesInput): Task[] {
+    if (!input.scheduledDate) throw new DomainError('VALIDATION', '重复任务需要先选择首次计划日期。')
+    const seriesId = randomUUID()
+    const base = new Date(`${input.scheduledDate}T12:00:00`)
+    return this.db.transaction(() => Array.from({ length: input.occurrences }, (_, index) => {
+      const date = new Date(base)
+      date.setDate(base.getDate() + index * 7)
+      const scheduledDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+      const task = this.create({ ...input, scheduledDate })
+      const next = { ...task, seriesId, recurrence: input.recurrence, occurrenceDate: scheduledDate }
+      this.db.update(tasks).set(next).where(eq(tasks.id, task.id)).run()
+      return next
+    }))
+  }
+  updateSeries(seriesId: string, fromDate: string, patch: TaskPatch): Task[] {
+    const targets = this.list().filter((task) => task.seriesId === seriesId && (task.occurrenceDate ?? '') >= fromDate)
+    if (!targets.length) throw new DomainError('NOT_FOUND', '没有可更新的后续重复安排。')
+    return targets.map((task) => this.update(task.id, patch))
   }
   update(id: string, patch: TaskPatch): Task {
     const current = this.get(id)

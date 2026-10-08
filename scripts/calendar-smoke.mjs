@@ -50,7 +50,7 @@ async function launch() {
     window.setBounds({ width: 1440, height: 1000 })
   })
   page.on('pageerror', (error) => errors.push(error.message))
-  await page.getByRole('heading', { name: 'Today Plan', exact: true }).waitFor()
+  await page.getByRole('heading', { name: '今日计划', exact: true }).waitFor()
   assert.equal(await app.evaluate(({ app }) => app.getPath('userData')), dataDirectory)
 }
 try {
@@ -137,7 +137,7 @@ try {
     { today, nextWeek }
   )
   await page.reload()
-  await page.getByRole('heading', { name: 'Today Plan', exact: true }).waitFor()
+  await page.getByRole('heading', { name: '今日计划', exact: true }).waitFor()
   const before = await snapshot()
   const storageBefore = await page.evaluate(() => window.workbench.storageSnapshot())
   await nav('日历')
@@ -197,13 +197,7 @@ try {
     1
   )
   await nav('日历')
-  assert.equal(
-    await page
-      .getByRole('button', { name: /^新建任务/ })
-      .first()
-      .isEnabled(),
-    true
-  )
+  assert.equal(await page.getByRole('textbox', { name: '添加一个研究任务' }).isEnabled(), true)
   assert.deepEqual((await titles()).sort(), ['重建实验', '方法章节', '归档项目安排'].sort())
   check(
     'Mini-calendar, archived work in All Tasks and the shared calendar remain available without project-page navigation'
@@ -214,7 +208,8 @@ try {
   assert.deepEqual(await page.evaluate(() => window.workbench.storageSnapshot()), storageBefore)
   check('Calendar navigation leaves all saved task/project fields and storage locations unchanged')
   await page.getByLabel('新计划所属项目').selectOption(ids.b)
-  const recognition = page.getByRole('switch', { name: 'AI 识别', exact: true })
+  await page.getByText('更多选项', { exact: false }).first().click()
+  const recognition = page.getByRole('switch', { name: 'AI 识别日期时间和项目', exact: true })
   if ((await recognition.getAttribute('aria-checked')) === 'true') await recognition.click()
   await page.getByRole('textbox', { name: '添加一个研究任务', exact: true }).fill('从汇总日历新增')
   await page.getByRole('button', { name: '直接添加任务', exact: true }).click()

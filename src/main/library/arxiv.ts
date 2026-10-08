@@ -4,11 +4,14 @@ import { mkdir } from 'node:fs/promises'
 import { setTimeout as delay } from 'node:timers/promises'
 import { XMLParser, XMLValidator } from 'fast-xml-parser'
 import { defaultArxivSettings, localDay } from '../../shared/arxiv'
-import type { ArxivRun, ArxivSettings, ArxivSnapshot, Paper } from '../../shared/types'
+import type { ArxivCandidate, ArxivRun, ArxivSettings, ArxivSnapshot, Paper } from '../../shared/types'
 import { arxivSettingsSchema } from '../../domain/research'
 import { DomainError } from '../../domain/errors'
 import { researchFetch } from './research-network'
 import type { LibraryRepository } from '../database/repositories/library'
+import type { PaperOverview } from '../../shared/overview'
+import { overviewTranslationSchema } from '../../domain/overview'
+import { cachePaperOverview } from './overview'
 
 export interface ArxivEntry {
   arxivId: string
@@ -76,6 +79,10 @@ export function relevance(entry: ArxivEntry, directions: string[]) {
   }
   return score
 }
+export function relevanceReasons(entry: ArxivEntry, directions: string[]) {
+  const full = normalized(`${entry.title} ${entry.abstract}`)
+  return directions.filter((direction) => directionTerms(direction).map(normalized).every((term) => full.includes(term)))
+}
 function readJson<T>(repo: LibraryRepository, key: string, fallback: T): T {
   try { return JSON.parse(repo.setting(key, JSON.stringify(fallback))) as T } catch { return fallback }
 }
@@ -83,12 +90,17 @@ type Dependencies = {
   fetch: (url: string, init: RequestInit) => Promise<Response>
   now: () => Date
   wait: (ms: number, signal: AbortSignal) => Promise<void>
+  translate: (id: string, signal: AbortSignal) => Promise<PaperOverview>
 }
 
 export class ArxivDailyService {
   private settings: ArxivSettings
   private runs: ArxivRun[]
+  private candidates: ArxivCandidate[]
   private controller: AbortController | null = null
+  private downloads = new Map<string, { controller: AbortController; status: 'queued' | 'downloading' | 'failed'; error: string; promise: Promise<void> }>()
+  private downloadTail: Promise<void> = Promise.resolve()
+  private requestTail: Promise<void> = Promise.resolve()
   private timer: ReturnType<typeof setInterval> | null = null
   private stopped = false
   private progress = ''
@@ -98,17 +110,79 @@ export class ArxivDailyService {
     private readonly save: (entry: ArxivEntry, bytes: Buffer, day: string) => Promise<Paper>,
     private readonly changed: () => void, private readonly directory: string | (() => string), dependencies?: Partial<Dependencies>) {
     this.dependencies = { fetch: researchFetch, now: () => new Date(),
-      wait: async (ms, signal) => { await delay(ms, undefined, { signal }) }, ...dependencies }
+      wait: async (ms, signal) => { await delay(ms, undefined, { signal }) },
+      translate: async () => { throw new DomainError('UNAVAILABLE', '请先到设置 → AI 助手配置模型与 API，再重试摘要翻译。') }, ...dependencies }
     const settings = arxivSettingsSchema.safeParse(readJson(repo, 'arxiv.settings', defaultArxivSettings))
     this.settings = settings.success ? settings.data : structuredClone(defaultArxivSettings)
     const runs = readJson<ArxivRun[]>(repo, 'arxiv.runs', [])
     this.runs = Array.isArray(runs) ? runs.slice(0, 20).map((run) => run.status === 'running'
-      ? { ...run, status: 'interrupted', finishedAt: this.dependencies.now().toISOString(), message: '上次下载被关闭应用中断，已保存的 PDF 保留，可立即重试。' } : run) : []
+      ? { ...run, status: 'interrupted', finishedAt: this.dependencies.now().toISOString(), message: '上次检索被关闭应用中断，已保存的 PDF 保留，可立即重试。' } : run) : []
+    const candidates = readJson<ArxivCandidate[]>(repo, 'arxiv.candidates.v1', [])
+    this.candidates = Array.isArray(candidates) ? candidates.slice(0, 200).map(candidate => ({ ...candidate,
+      translationState: candidate.translationState === 'translating' ? 'queued' : candidate.translationState })) : []
     this.persist()
   }
   snapshot(): ArxivSnapshot {
-    return { settings: this.settings, runs: this.runs, running: !!this.controller, progress: this.progress, directory: this.currentDirectory() }
+    const visible = this.candidates.filter(candidate => !candidate.ignored)
+    const ready = visible.filter(candidate => this.ready(candidate))
+    const unfinished = visible.filter(candidate => !this.ready(candidate))
+    return { settings: this.settings, runs: this.runs, running: !!this.controller, progress: this.progress,
+      directory: this.currentDirectory(), candidates: ready,
+      preparation: { ready: ready.length, pending: unfinished.filter(candidate => candidate.translationState !== 'failed').length,
+        failed: unfinished.filter(candidate => candidate.translationState === 'failed').length,
+        error: unfinished.find(candidate => candidate.translationError)?.translationError ?? '' },
+      downloads: [...this.downloads].map(([id, job]) => ({ id, status: job.status, error: job.error })) }
   }
+  candidate(id: string) { return this.candidates.find(candidate => candidate.id === id && !candidate.ignored) }
+  updateOverview(id: string, overview: PaperOverview) {
+    const candidate = this.candidate(id)
+    if (!candidate || candidate.abstract !== overview.sourceAbstract) return
+    candidate.overview = overview; candidate.translationState = undefined; candidate.translationError = ''
+    this.persistCandidates(); this.changed()
+  }
+  setTranslator(translate: Dependencies['translate']) { this.dependencies.translate = translate }
+  private ready(candidate: ArxivCandidate) {
+    return candidate.overview?.sourceAbstract === candidate.abstract && overviewTranslationSchema.safeParse({ titleZh: candidate.overview.titleZh, abstractZh: candidate.overview.abstractZh }).success
+  }
+  resumeTranslations() {
+    if (this.controller || this.stopped || !this.candidates.some(candidate => !candidate.ignored && !this.ready(candidate))) return
+    const controller = this.controller = new AbortController()
+    void this.prepareCandidates(controller.signal).then(() => {
+      this.status(this.preparationMessage())
+    }).catch((error: unknown) => {
+      if (!this.stopped) this.status(controller.signal.aborted ? '摘要翻译已暂停，已完成的候选可继续筛选。' : arxivError(error))
+    }).finally(() => {
+      if (!this.stopped) { this.controller = null; this.changed() }
+    })
+  }
+  private preparationMessage() {
+    const { preparation } = this.snapshot()
+    return preparation.failed ? `${preparation.ready} 篇中英摘要已就绪，${preparation.failed} 篇翻译待重试。`
+      : preparation.ready ? `${preparation.ready} 篇候选的中英标题与摘要已就绪，可以开始筛选。` : '没有符合当前关键词、排除词和时间范围的新论文。'
+  }
+  private async prepareCandidates(signal: AbortSignal) {
+    const pending = this.candidates.filter(candidate => !candidate.ignored && !this.ready(candidate))
+    for (const [index, candidate] of pending.entries()) {
+      signal.throwIfAborted()
+      candidate.translationState = 'translating'; candidate.translationError = ''
+      this.persistCandidates(); this.status(`正在翻译标题与摘要 ${index + 1} / ${pending.length} · 完成后加入待筛选候选…`)
+      try {
+        const overview = await this.dependencies.translate(candidate.id, signal)
+        signal.throwIfAborted()
+        overviewTranslationSchema.parse({ titleZh: overview.titleZh, abstractZh: overview.abstractZh })
+        if (overview.sourceAbstract !== candidate.abstract) throw new Error('候选摘要已变化，请重试翻译。')
+        candidate.overview = overview
+        candidate.translationState = undefined
+      } catch (error) {
+        candidate.translationState = signal.aborted ? 'queued' : 'failed'
+        candidate.translationError = signal.aborted ? '' : error instanceof Error ? error.message : '摘要翻译失败，请重试。'
+        if (signal.aborted) throw error
+      } finally {
+        if (!this.stopped) { this.persistCandidates(); this.changed() }
+      }
+    }
+  }
+  busy() { return !!this.controller || [...this.downloads.values()].some(job => job.status !== 'failed') }
   private currentDirectory() { return typeof this.directory === 'string' ? this.directory : this.directory() }
   configure(settings: ArxivSettings) {
     if (this.controller) throw new DomainError('VALIDATION', '请先等待本次检索完成或停止检索，再修改设置。')
@@ -121,6 +195,7 @@ export class ArxivDailyService {
     this.timer = setInterval(() => this.checkAutomatic(), 60_000)
     this.timer.unref()
     this.checkAutomatic()
+    this.resumeTranslations()
   }
   checkAutomatic() {
     if (this.stopped || !this.settings.enabled || this.controller) return
@@ -145,8 +220,14 @@ export class ArxivDailyService {
     if (error) throw new DomainError('UNAVAILABLE', `无法打开下载目录：${error}`)
   }
   private persist() { this.repo.setSetting('arxiv.runs', JSON.stringify(this.runs.slice(0, 20))) }
+  private persistCandidates() { this.repo.setSetting('arxiv.candidates.v1', JSON.stringify(this.candidates.slice(0, 200))) }
   private status(value: string) { if (this.stopped) return; this.progress = value; this.changed() }
-  private async request(url: string, signal: AbortSignal, maxSize: number) {
+  private request(url: string, signal: AbortSignal, maxSize: number): Promise<Buffer> {
+    const request = this.requestTail.then(() => this.fetchRequest(url, signal, maxSize))
+    this.requestTail = request.then(() => undefined, () => undefined)
+    return request
+  }
+  private async fetchRequest(url: string, signal: AbortSignal, maxSize: number) {
     // Only canonical arXiv endpoints, serial requests, at least 3.1 seconds apart.
     const target = new URL(url)
     if (target.protocol !== 'https:' || !['arxiv.org', 'export.arxiv.org'].includes(target.hostname)) throw new Error('仅支持 arXiv 来源。')
@@ -182,7 +263,7 @@ export class ArxivDailyService {
     const first = new Date(`${day}T12:00:00`)
     first.setDate(first.getDate() - this.settings.daysBack + 1)
     const from = localDay(first)
-    const cacheKey = JSON.stringify([day, this.settings.daysBack, this.settings.directions])
+    const cacheKey = JSON.stringify([day, this.settings.daysBack, this.settings.directions, this.settings.excludedKeywords])
     const cache = readJson<{ key: string; entries: ArxivEntry[] } | null>(this.repo, 'arxiv.cache', null)
     if (cache?.key === cacheKey && Array.isArray(cache.entries)) return cache.entries
     const found = new Map<string, ArxivEntry>()
@@ -210,39 +291,32 @@ export class ArxivDailyService {
     this.runs = [run, ...this.runs].slice(0, 20)
     this.persist(); this.status(run.message)
     try {
-      const downloaded = this.repo.downloads()
-      const quota = Math.max(0, this.settings.maxPerDay - downloaded.filter((item) => item.downloadedDate === date).length)
-      if (!quota) { run.message = `今日已达到 ${this.settings.maxPerDay} 篇下载上限。`; run.status = 'success'; return }
-      const seen = new Set(downloaded.map((item) => item.arxivId))
-      const entries = (await this.search(date, signal)).filter((entry) => !seen.has(entry.arxivId) && relevance(entry, this.settings.directions) > 0)
+      const found = await this.search(date, signal)
+      // Decisions and downloads can complete while a search is awaiting the network.
+      const seen = new Set(this.repo.downloads().map((item) => item.arxivId))
+      const ignored = new Set(this.candidates.filter((candidate) => candidate.ignored).map((candidate) => candidate.arxivId))
+      const exclusions = this.settings.excludedKeywords.map(normalized).filter(Boolean)
+      const entries = found.filter((entry) => {
+        const full = normalized(`${entry.title} ${entry.abstract}`)
+        return !seen.has(entry.arxivId) && !ignored.has(entry.arxivId) && relevance(entry, this.settings.directions) > 0 && !exclusions.some((keyword) => full.includes(keyword))
+      })
         .sort((a, b) => relevance(b, this.settings.directions) - relevance(a, this.settings.directions) || b.publishedDate.localeCompare(a.publishedDate))
       run.candidates = entries.length
-      this.persist()
-      for (const entry of entries.slice(0, quota + 5)) {
-        if (run.downloaded >= quota) break
-        signal.throwIfAborted()
-        this.status(`正在下载 ${run.downloaded + 1} / ${Math.min(quota, entries.length)}：${entry.title}`)
-        try {
-          const bytes = await this.request(`https://arxiv.org/pdf/${entry.pdfId}`, signal, 100 * 1024 * 1024)
-          if (!bytes.subarray(0, 1024).includes(Buffer.from('%PDF-'))) throw new Error('返回内容不是 PDF，未保存。')
-          signal.throwIfAborted()
-          if (this.stopped) break
-          await this.save(entry, bytes, date)
-          if (this.stopped) break
-          run.downloaded++
-          this.persist()
-        } catch (error) {
-          if (signal.aborted) throw error
-          run.failures.push(`${entry.arxivId}：${arxivError(error)}`)
-          if (error instanceof Error && /HTTP (429|503)/.test(error.message)) break
-        }
-      }
-      run.status = run.failures.length ? run.downloaded ? 'partial' : 'failed' : 'success'
-      run.message = run.downloaded ? `已下载 ${run.downloaded} 篇 PDF${run.failures.length ? `，${run.failures.length} 篇下载未完成，可重试` : ''}。`
-        : run.failures.length ? 'PDF 下载未完成，请查看原因后重试。' : '本次没有匹配且未下载的新文献。'
+      const previous = new Map(this.candidates.map((candidate) => [candidate.arxivId, candidate]))
+      const next = entries.slice(0, this.settings.maxPerDay).map((entry) => {
+        const old = previous.get(entry.arxivId)
+        const reasons = relevanceReasons(entry, this.settings.directions)
+        return { ...entry, id: entry.arxivId, matchReason: reasons.length ? `匹配：${reasons.join('；')}` : '与研究方向相关', favorite: old?.favorite ?? false, ignored: false,
+          ...(old?.title === entry.title && old.abstract === entry.abstract ? { overview: old.overview } : {}) }
+      })
+      this.candidates = [...next, ...this.candidates.filter((candidate) => candidate.ignored || (!seen.has(candidate.arxivId) && !next.some((item) => item.arxivId === candidate.arxivId)))].slice(0, 200)
+      this.persistCandidates()
+      await this.prepareCandidates(signal)
+      run.status = this.snapshot().preparation.failed ? 'partial' : 'success'
+      run.message = this.preparationMessage()
     } catch (error) {
       run.status = signal.aborted ? 'cancelled' : 'failed'
-      run.message = signal.aborted ? '检索已停止，已保存的 PDF 保留。' : arxivError(error)
+      run.message = signal.aborted ? '检索与摘要翻译已停止，已完成的候选可继续筛选。' : arxivError(error)
     } finally {
       if (!this.stopped) {
         run.finishedAt = this.dependencies.now().toISOString()
@@ -251,10 +325,62 @@ export class ArxivDailyService {
       }
     }
   }
+  async candidateAction(id: string, action: 'favorite' | 'unfavorite' | 'ignore' | 'download') {
+    const candidate = this.candidates.find((item) => item.id === id)
+    if (!candidate) throw new DomainError('NOT_FOUND', '这篇候选论文已不在当前列表中。')
+    if (action === 'unfavorite') {
+      this.downloads.get(id)?.controller.abort()
+      this.downloads.delete(id)
+      candidate.favorite = false
+      this.persistCandidates(); this.changed(); return
+    }
+    if (action === 'ignore') {
+      this.downloads.get(id)?.controller.abort()
+      this.downloads.delete(id)
+      candidate.ignored = true
+      candidate.favorite = false
+      this.persistCandidates(); this.changed(); return
+    }
+    if (this.stopped) throw new DomainError('UNAVAILABLE', '应用正在关闭，请重新打开后下载。')
+    if (!this.ready(candidate)) throw new DomainError('VALIDATION', '中英标题与摘要尚未就绪，请等待翻译完成后收藏。')
+    const existing = this.downloads.get(id)
+    if (existing && existing.status !== 'failed') return existing.promise
+    if (action === 'favorite') {
+      candidate.favorite = true
+      this.persistCandidates(); this.changed()
+    }
+    const job = { controller: new AbortController(), status: 'queued' as 'queued' | 'downloading' | 'failed', error: '', promise: Promise.resolve() }
+    job.promise = this.downloadTail.then(async () => {
+      job.controller.signal.throwIfAborted()
+      job.status = 'downloading'; this.changed()
+      const bytes = await this.request(`https://arxiv.org/pdf/${candidate.pdfId}`, job.controller.signal, 100 * 1024 * 1024)
+      job.controller.signal.throwIfAborted()
+      if (!bytes.subarray(0, 1024).includes(Buffer.from('%PDF-'))) throw new Error('返回内容不是 PDF，未保存。')
+      const paper = await this.save({ ...candidate }, bytes, localDay(this.dependencies.now()))
+      if (this.stopped) return
+      this.repo.updatePaper(paper.id, { matchReason: candidate.matchReason, arxivFavorite: candidate.favorite })
+      if (candidate.overview) cachePaperOverview(this.repo, paper, candidate.overview)
+      this.candidates = this.candidates.filter((item) => item.id !== id)
+      this.persistCandidates()
+      this.downloads.delete(id)
+    }).catch((error: unknown) => {
+      if (this.stopped || job.controller.signal.aborted) {
+        if (this.downloads.get(id) === job) this.downloads.delete(id)
+        return
+      }
+      job.status = 'failed'; job.error = arxivError(error)
+      throw new DomainError('UNAVAILABLE', job.error)
+    }).finally(() => { if (!this.stopped) this.changed() })
+    this.downloads.set(id, job)
+    this.downloadTail = job.promise.catch(() => undefined)
+    this.changed()
+    return job.promise
+  }
   stop() {
     this.stopped = true
     if (this.timer) clearInterval(this.timer)
     this.controller?.abort()
+    for (const job of this.downloads.values()) job.controller.abort()
     const run = this.runs.find((item) => item.status === 'running')
     if (run) { run.status = 'interrupted'; run.finishedAt = this.dependencies.now().toISOString(); run.message = '应用已关闭，已保存的 PDF 保留。'; this.persist() }
   }

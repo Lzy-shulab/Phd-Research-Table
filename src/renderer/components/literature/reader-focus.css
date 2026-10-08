@@ -1,0 +1,56 @@
+.reader-dialog .reader-back-button {
+  justify-self: start;
+  width: max-content;
+  min-width: 0;
+  max-width: 100%;
+  padding-inline: 12px;
+  white-space: nowrap;
+}
+
+.reader-dialog .reader-annotation-total { margin-left: auto; color: var(--text-secondary); font-size: .76rem; white-space: nowrap; }
+.reader-dialog .reader-annotation-groups { display: grid; gap: 8px; }
+.reader-dialog .reader-annotation-group h3 { font-size: .88rem; font-weight: 600; }
+.reader-dialog .reader-category-toggle {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 42px;
+  padding: 10px 12px;
+  text-align: left;
+  border-radius: 10px;
+  color: var(--text-primary);
+  background: var(--surface-inset);
+  transition: background-color 160ms ease-out, color 160ms ease-out;
+}
+.reader-dialog .reader-category-toggle:hover { background: var(--surface-hover); }
+.reader-dialog .reader-category-toggle[aria-expanded='true'] { background: var(--accent-soft); }
+.reader-dialog .reader-category-toggle i { width: 8px; height: 8px; flex-shrink: 0; border-radius: 50%; background: var(--highlight-dot); }
+.reader-dialog .reader-category-toggle small { margin-left: auto; font-weight: 400; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.reader-dialog .reader-category-toggle > svg { color: var(--text-secondary); transition: transform 180ms cubic-bezier(.16, 1, .3, 1); }
+.reader-dialog .reader-category-toggle[aria-expanded='true'] > svg { transform: rotate(180deg); }
+.reader-dialog .reader-category-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.reader-dialog .reader-annotation-group .reader-annotation-list { padding: 10px 0 8px; animation: reader-annotation-reveal 170ms ease-out; }
+.reader-dialog .reader-annotation { background: transparent; border-radius: 8px; border: 0; }
+.reader-dialog .reader-annotation + .reader-annotation { border-top: 1px solid var(--border-default); padding-top: 3px; }
+.reader-dialog .reader-annotation.is-active { background: var(--surface-inset); }
+.reader-dialog .reader-annotation-jump { padding: 11px 12px; }
+.reader-dialog .reader-annotation-jump > span { padding-right: 22px; }
+.reader-dialog .reader-annotation-jump small { margin-left: 0; }
+.reader-dialog .reader-annotation-empty { padding: 8px 12px; }
+.reader-dialog .pdf-highlight,
+.reader-dialog .pdf-highlight.is-located {
+  opacity: .32;
+  outline: none;
+  border: 0;
+  box-shadow: none;
+  border-radius: 1px;
+  animation: none;
+}
+.reader-dialog .pdf-page[data-rendered='false'] .pdf-highlight-layer { visibility: hidden; }
+
+@keyframes reader-annotation-reveal { from { opacity: .55; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .reader-dialog .reader-category-toggle > svg { transition: none; }
+  .reader-dialog .reader-annotation-group .reader-annotation-list { animation: none; }
+}

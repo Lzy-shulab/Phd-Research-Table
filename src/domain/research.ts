@@ -13,7 +13,12 @@ export const publicationFields = {
   jcrQuartile: z.enum(['', 'Q1', 'Q2', 'Q3', 'Q4', '非SCI']),
   honors: z.array(z.enum(publicationHonors)).max(publicationHonors.length)
     .refine((values) => new Set(values).size === values.length, '同一论文荣誉不能重复。'),
-  notes: z.string().max(50000)
+  notes: z.string().max(50000),
+  authorRole: z.string().max(200).optional(),
+  coFirstAuthor: z.boolean().optional(),
+  correspondingAuthor: z.boolean().optional(),
+  partitionYear: z.string().regex(/^$|^\d{4}$/, '分区年份应为四位年份。').optional(),
+  tags: z.array(z.string().trim().min(1).max(80)).max(30).optional()
 }
 export const publicationSchema = z.object({ ...publicationFields, honors: publicationFields.honors.default([]) }).strict()
 export const arxivSettingsSchema = z.object({
@@ -23,5 +28,6 @@ export const arxivSettingsSchema = z.object({
   directions: z.array(z.string().trim().min(2).max(180)
     .regex(/^[\p{L}\p{N}\s.,+\-/]+$/u, '研究关键词只需填写词组，多条件用 AND 连接。')
     .refine((value) => value.split(/\s+AND\s+/i).every((term) => term.trim().length >= 2), 'AND 两侧都需要填写关键词。'))
-    .min(1, '请至少填写一个研究方向。').max(30)
+    .min(1, '请至少填写一个研究方向。').max(30),
+  excludedKeywords: z.array(z.string().trim().min(2).max(100)).max(50).default([])
 }).strict()

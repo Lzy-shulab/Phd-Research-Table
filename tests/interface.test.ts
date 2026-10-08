@@ -19,17 +19,17 @@ describe('Interface preferences and engine progress', () => {
       const repository = new SettingsRepository(connection.db)
       expect(repository.getInterface()).toEqual(defaultInterfacePreferences)
       expect(connection.sqlite.prepare('SELECT * FROM app_settings ORDER BY key').all()).toEqual(before)
-      repository.setInterface({ ...defaultInterfacePreferences, fontSize: 18, background: 'sage' })
+      repository.setInterface({ ...defaultInterfacePreferences, fontSize: 18, background: 'sage', dockAutoHide: true })
       const restored = new SettingsRepository(connection.db).getInterface()
-      expect(restored).toMatchObject({ fontSize: 18, background: 'sage' })
+      expect(restored).toMatchObject({ fontSize: 18, background: 'sage', dockAutoHide: true })
       expect(connection.sqlite.prepare("SELECT * FROM app_settings WHERE key <> 'interface.preferences' ORDER BY key").all()).toEqual(before)
       expect(connection.sqlite.pragma('integrity_check', { simple: true })).toBe('ok')
-      expect(connection.sqlite.prepare('SELECT * FROM __drizzle_migrations').all()).toHaveLength(6)
+      expect(connection.sqlite.prepare('SELECT * FROM __drizzle_migrations').all()).toHaveLength(8)
     } finally { connection.close(); rmSync(directory, { recursive: true, force: true }) }
   })
   it('rejects arbitrary font sizes, unknown settings and unowned background paths', () => {
     const legacy = { background: 'default', fontSize: 14, backgroundFile: null, backgroundName: '' }
-    expect(interfacePreferencesSchema.parse({ ...legacy, background: 'custom', backgroundFile: `${'a'.repeat(64)}.jpg`, fontSize: 18 })).toMatchObject({ panelOpacity: 75, fontSize: 18, background: 'custom', backgroundFile: `${'a'.repeat(64)}.jpg` })
+    expect(interfacePreferencesSchema.parse({ ...legacy, background: 'custom', backgroundFile: `${'a'.repeat(64)}.jpg`, fontSize: 18 })).toMatchObject({ panelOpacity: 75, fontSize: 18, background: 'custom', backgroundFile: `${'a'.repeat(64)}.jpg`, dockAutoHide: false })
     expect(interfacePatchSchema.safeParse({ panelOpacity: 19 }).success).toBe(false)
     expect(interfacePatchSchema.safeParse({ panelOpacity: 101 }).success).toBe(false)
     expect(interfacePatchSchema.safeParse({ fontSize: 500 }).success).toBe(false)

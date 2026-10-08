@@ -2,13 +2,14 @@ import { useState } from 'react'
 import { ChevronDown, ChevronRight, Folder, FolderOpen, Library, MoreHorizontal, Plus, Rss } from 'lucide-react'
 import { motion } from 'motion/react'
 import type { LibraryFolder } from '../../../shared/types'
+import { ARXIV_LIBRARY_FOLDER } from '../../../shared/arxiv'
 import { useLibrary } from '../../stores/library'
 import { cn } from '../../lib/utils'
 import { Button } from '../ui/button'
 import { FolderDialog } from './FolderDialog'
 
 export function LibrarySidebar() {
-  const { folders, papers, folderId, selectFolder } = useLibrary()
+  const { folders, papers, arxiv, folderId, selectFolder } = useLibrary()
   const [dialog, setDialog] = useState<{ folder?: LibraryFolder; parentId?: string | null } | null>(null)
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const descendants = (id: string): Set<string> => {
@@ -38,9 +39,9 @@ export function LibrarySidebar() {
   }
   return <>
     <nav className="library-nav" aria-label="文献文件夹">
-      {[{ id: 'all', name: '全部文献', icon: Library, count: papers.filter((p) => p.collection === 'library').length },
+      {[{ id: 'all', name: '全部文献', icon: Library, count: papers.filter((p) => p.collection !== 'publication').length },
         { id: 'unfiled', name: '未分类', icon: Folder, count: papers.filter((p) => p.collection === 'library' && !p.folderId).length },
-        { id: 'arxiv', name: 'Arxiv Daily', icon: Rss, count: papers.filter((p) => p.collection === 'arxiv').length }].map((item) =>
+        { id: 'arxiv', name: 'Arxiv Daily', icon: Rss, count: arxiv.candidates.length }].map((item) =>
         <button key={item.id} className={cn('sidebar-link', folderId === item.id && 'selected')} onClick={() => selectFolder(item.id)}>
           {folderId === item.id && <motion.span className="nav-selection" layoutId="library-selection" />}
           <item.icon size={17} /><span>{item.name}</span><small className="nav-count">{item.count}</small>
@@ -49,7 +50,17 @@ export function LibrarySidebar() {
     <div className="sidebar-section-label"><span>我的文件夹</span>
       <Button variant="ghost" className="icon-button small" aria-label="新建文献文件夹" onClick={() => setDialog({ parentId: null })}><Plus size={15} /></Button>
     </div>
-    <div className="folder-tree">{folders.filter((f) => !f.parentId).map((folder) => row(folder))}</div>
+    <div className="folder-tree">
+      <div className={cn('folder-row', folderId === ARXIV_LIBRARY_FOLDER && 'selected')}>
+        <span className="folder-expand" />
+        <button className="folder-name" aria-current={folderId === ARXIV_LIBRARY_FOLDER ? 'page' : undefined} onClick={() => selectFolder(ARXIV_LIBRARY_FOLDER)} title="Arxiv Daily 收藏的文献">
+          {folderId === ARXIV_LIBRARY_FOLDER ? <FolderOpen size={16} /> : <Folder size={16} />}<span>Arvix</span>
+          <small>{papers.filter(paper => paper.collection === 'arxiv').length}</small>
+        </button>
+        <span className="folder-actions-placeholder" aria-hidden="true" />
+      </div>
+      {folders.filter((f) => !f.parentId).map((folder) => row(folder))}
+    </div>
     <button className="new-project" onClick={() => setDialog({ parentId: null })}><Plus size={15} />新建文件夹</button>
     {!folders.length && <p className="sidebar-note">为常读的期刊建一个文件夹，让文献各归其位。</p>}
     {dialog && <FolderDialog key={dialog.folder?.id ?? `new-${dialog.parentId ?? 'root'}`} folder={dialog.folder} parentId={dialog.parentId} onClose={() => setDialog(null)} />}

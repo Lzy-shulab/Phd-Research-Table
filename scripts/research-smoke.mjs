@@ -28,7 +28,7 @@ async function launch() {
   page = await app.firstWindow()
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].hide())
   page.on('pageerror', (error) => errors.push(error.message))
-  await page.getByRole('heading', { name: 'Today Plan', exact: true }).waitFor()
+  await page.getByRole('heading', { name: '今日计划', exact: true }).waitFor()
 }
 try {
   await launch()
@@ -41,7 +41,7 @@ try {
   await capture('all-tasks-notes-light.png')
   await page
     .getByRole('navigation', { name: '研究计划视图' })
-    .getByRole('button', { name: /^Today Plan/ })
+    .getByRole('button', { name: /^今日计划/ })
     .click()
   assert.equal(
     await page.locator('.task-content').filter({ hasText: '准备本周导师组会' }).count(),
@@ -68,11 +68,11 @@ try {
   )
   await page
     .getByRole('navigation', { name: '研究计划视图' })
-    .getByRole('button', { name: /^Today Plan/ })
+    .getByRole('button', { name: /^今日计划/ })
     .click()
   assert.ok(await page.locator('.task-content').filter({ hasText: '准备本周导师组会' }).count())
   record(
-    'All Tasks groups work by project notes while Today Plan and calendar combine every project'
+    'All Tasks groups work by project notes while 今日计划 and calendar combine every project'
   )
 
   await page
