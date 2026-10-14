@@ -33,6 +33,8 @@ jobs:
           "RELEASE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
       - name: Install dependencies
         run: npm ci
+      - name: Install Electron runtime
+        run: node node_modules/electron/install.js
       - name: Verify source
         shell: pwsh
         run: |
