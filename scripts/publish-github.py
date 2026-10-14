@@ -25,7 +25,9 @@ headers = {'Authorization': f'Bearer {token}', 'Accept': 'application/vnd.github
 def run_curl(args):
     config = '\n'.join(f'header = "{key}: {value}"' for key, value in headers.items())
     for attempt in range(5):
-        response = subprocess.run(args, input=config, capture_output=True, encoding='utf-8')
+        response = subprocess.run(args, input=config.encode('utf-8'), capture_output=True)
+        response.stdout = response.stdout.decode('utf-8', errors='replace')
+        response.stderr = response.stderr.decode('gb18030' if os.name == 'nt' else 'utf-8', errors='replace')
         # These failures happen before an HTTP request can reach GitHub.
         if response.returncode not in {6, 7, 35} or attempt == 4:
             return response
