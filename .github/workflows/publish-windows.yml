@@ -17,10 +17,6 @@ jobs:
     timeout-minutes: 30
     env:
       REQUESTED_VERSION: ${{ inputs.version }}
-      WORKBENCH_DISABLE_ARXIV_AUTO: '1'
-      WORKBENCH_DISABLE_METADATA_AUTO: '1'
-      WORKBENCH_DISABLE_ENCOURAGEMENT_AUTO: '1'
-      WORKBENCH_DISABLE_NOTIFICATIONS: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -51,6 +47,11 @@ jobs:
       - name: Package Windows
         run: npx electron-builder --win nsis --config.nsis.differentialPackage=false
       - name: Verify packaged application
+        env:
+          WORKBENCH_DISABLE_ARXIV_AUTO: '1'
+          WORKBENCH_DISABLE_METADATA_AUTO: '1'
+          WORKBENCH_DISABLE_ENCOURAGEMENT_AUTO: '1'
+          WORKBENCH_DISABLE_NOTIFICATIONS: '1'
         shell: pwsh
         run: |
           $env:WORKBENCH_TEST_EXECUTABLE = Join-Path (Get-Location) 'release/win-unpacked/PhD 科研工作台.exe'
