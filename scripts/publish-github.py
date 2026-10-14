@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import ssl
 import subprocess
 import urllib.request
 import urllib.error
@@ -21,7 +22,9 @@ token = credential_fields.get('password')
 if not token:
     raise RuntimeError('GitHub credential helper returned no credential')
 proxy_url = os.environ.get('WORKBENCH_PUBLISH_PROXY', '')
-opener = urllib.request.build_opener(urllib.request.ProxyHandler({'http': proxy_url, 'https': proxy_url} if proxy_url else {}))
+ssl_context = ssl.create_default_context()
+ssl_context.maximum_version = ssl.TLSVersion.TLSv1_2
+opener = urllib.request.build_opener(urllib.request.ProxyHandler({'http': proxy_url, 'https': proxy_url} if proxy_url else {}), urllib.request.HTTPSHandler(context=ssl_context))
 headers = {'Authorization': f'Bearer {token}', 'Accept': 'application/vnd.github+json', 'User-Agent': 'PhD-Workbench-Publisher', 'X-GitHub-Api-Version': '2022-11-28'}
 
 def api(path, method='GET', body=None):
@@ -90,10 +93,10 @@ def publish():
             raise RuntimeError(f'Incomplete existing asset: {path.name}')
         if proxy_url:
             proxy = urllib.parse.urlparse(proxy_url)
-            connection = http.client.HTTPSConnection(proxy.hostname, proxy.port, timeout=300)
+            connection = http.client.HTTPSConnection(proxy.hostname, proxy.port, timeout=300, context=ssl_context)
             connection.set_tunnel('uploads.github.com', 443)
         else:
-            connection = http.client.HTTPSConnection('uploads.github.com', timeout=300)
+            connection = http.client.HTTPSConnection('uploads.github.com', timeout=300, context=ssl_context)
         upload_path = f'/repos/{repository}/releases/{release["id"]}/assets?name={urllib.parse.quote(path.name)}'
         connection.putrequest('POST', upload_path)
         for key, value in {**headers, 'Content-Type': 'application/octet-stream', 'Content-Length': str(path.stat().st_size)}.items():
