@@ -4,10 +4,7 @@ import json
 import os
 from pathlib import Path
 import shutil
-import ssl
 import subprocess
-import urllib.request
-import urllib.error
 import urllib.parse
 
 workspace = Path(__file__).resolve().parent.parent
@@ -22,16 +19,25 @@ token = credential_fields.get('password')
 if not token:
     raise RuntimeError('GitHub credential helper returned no credential')
 proxy_url = os.environ.get('WORKBENCH_PUBLISH_PROXY', '')
-ssl_context = ssl.create_default_context()
-ssl_context.maximum_version = ssl.TLSVersion.TLSv1_2
-opener = urllib.request.build_opener(urllib.request.ProxyHandler({'http': proxy_url, 'https': proxy_url} if proxy_url else {}), urllib.request.HTTPSHandler(context=ssl_context))
 headers = {'Authorization': f'Bearer {token}', 'Accept': 'application/vnd.github+json', 'User-Agent': 'PhD-Workbench-Publisher', 'X-GitHub-Api-Version': '2022-11-28'}
 
 def api(path, method='GET', body=None):
-    data = None if body is None else json.dumps(body, ensure_ascii=False).encode('utf-8')
-    request = urllib.request.Request(f'https://api.github.com/repos/{repository}/{path}'.rstrip('/'), data=data, headers={**headers, 'Content-Type': 'application/json'}, method=method)
-    with opener.open(request, timeout=60) as response:
-        return json.load(response)
+    url = f'https://api.github.com/repos/{repository}/{path}'.rstrip('/')
+    args = ['curl.exe', '--config', '-', '--silent', '--show-error', '--fail', '--http1.1', '--tlsv1.2', '--tls-max', '1.2', '--max-time', '60', '--request', method]
+    if proxy_url:
+        args += ['--proxy', proxy_url]
+    else:
+        args += ['--noproxy', '*']
+    if method == 'GET':
+        args += ['--retry', '2']
+    args += ['--header', 'Content-Type: application/json', url]
+    if body is not None:
+        args += ['--data-binary', json.dumps(body, ensure_ascii=False)]
+    config = '\n'.join(f'header = "{key}: {value}"' for key, value in headers.items())
+    response = subprocess.run(args, input=config, capture_output=True, encoding='utf-8')
+    if response.returncode:
+        raise RuntimeError(f'GitHub API request failed: {response.stderr.strip()}')
+    return json.loads(response.stdout)
 
 def inspect():
     repo = api('')
@@ -83,7 +89,6 @@ def publish():
     paths = [workspace / 'release' / f'PhD-Research-Workbench-{version}-Setup.exe',
              workspace / 'test-results' / f'fixes-{version}' / 'update-assets' / f'PhD-Research-Workbench-{version}-Update.zip',
              workspace / 'test-results' / f'fixes-{version}' / 'update-assets' / 'latest-update.json']
-    import http.client
     for path in paths:
         existing = next((item for item in release['assets'] if item['name'] == path.name), None)
         if existing:
@@ -91,31 +96,18 @@ def publish():
                 print(f'ASSET_ALREADY_UPLOADED {path.name}', flush=True)
                 continue
             raise RuntimeError(f'Incomplete existing asset: {path.name}')
-        if proxy_url:
-            proxy = urllib.parse.urlparse(proxy_url)
-            connection = http.client.HTTPSConnection(proxy.hostname, proxy.port, timeout=300, context=ssl_context)
-            connection.set_tunnel('uploads.github.com', 443)
-        else:
-            connection = http.client.HTTPSConnection('uploads.github.com', timeout=300, context=ssl_context)
         upload_path = f'/repos/{repository}/releases/{release["id"]}/assets?name={urllib.parse.quote(path.name)}'
-        connection.putrequest('POST', upload_path)
-        for key, value in {**headers, 'Content-Type': 'application/octet-stream', 'Content-Length': str(path.stat().st_size)}.items():
-            connection.putheader(key, value)
-        connection.endheaders()
-        with path.open('rb') as source:
-            while True:
-                block = source.read(1024 * 1024)
-                if not block:
-                    break
-                connection.send(block)
-        response = connection.getresponse()
-        if response.status != 201:
-            raise RuntimeError(f'GitHub upload failed: HTTP {response.status}')
-        asset = json.loads(response.read())
+        args = ['curl.exe', '--config', '-', '--silent', '--show-error', '--fail', '--http1.1', '--tlsv1.2', '--tls-max', '1.2', '--max-time', '600',
+                '--request', 'POST', '--upload-file', str(path), '--header', 'Content-Type: application/octet-stream', f'https://uploads.github.com{upload_path}']
+        args += ['--proxy', proxy_url] if proxy_url else ['--noproxy', '*']
+        config = '\n'.join(f'header = "{key}: {value}"' for key, value in headers.items())
+        response = subprocess.run(args, input=config, capture_output=True, encoding='utf-8')
+        if response.returncode:
+            raise RuntimeError(f'GitHub upload failed: {response.stderr.strip()}')
+        asset = json.loads(response.stdout)
         if asset['state'] != 'uploaded' or asset['size'] != path.stat().st_size:
             raise RuntimeError('GitHub asset upload incomplete')
         print(f'ASSET_UPLOADED {path.name}', flush=True)
-        connection.close()
     published = api(f'releases/{release["id"]}', 'PATCH', {'draft': False, 'make_latest': 'true'})
     latest = api('releases/latest')
     assert latest['tag_name'] == f'v{version}'
