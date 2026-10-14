@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import urllib.request
 import urllib.error
+import urllib.parse
 
 workspace = Path(__file__).resolve().parent.parent
 version = json.loads((workspace / 'package.json').read_text(encoding='utf-8-sig'))['version']
@@ -19,7 +20,8 @@ credential_fields = dict(line.split('=', 1) for line in credential.stdout.splitl
 token = credential_fields.get('password')
 if not token:
     raise RuntimeError('GitHub credential helper returned no credential')
-opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+proxy_url = os.environ.get('WORKBENCH_PUBLISH_PROXY', '')
+opener = urllib.request.build_opener(urllib.request.ProxyHandler({'http': proxy_url, 'https': proxy_url} if proxy_url else {}))
 headers = {'Authorization': f'Bearer {token}', 'Accept': 'application/vnd.github+json', 'User-Agent': 'PhD-Workbench-Publisher', 'X-GitHub-Api-Version': '2022-11-28'}
 
 def api(path, method='GET', body=None):
@@ -72,13 +74,26 @@ def publish():
 - 统一设置页图标、标题和操作按钮的对齐，改善大字体和窄窗口布局。
 - 支持应用内下载更新包，重启后自动替换程序文件并重新打开工作台。
 - 精修工作区图标，改善页面切换、Dock、任务详情和弹层动效。'''
-    release = api('releases', 'POST', {'tag_name': f'v{version}', 'target_commitish': 'main', 'name': f'PhD 科研工作台 v{version}', 'body': notes, 'draft': True, 'prerelease': False})
+    release = next((item for item in api('releases?per_page=30') if item['tag_name'] == f'v{version}'), None)
+    if release is None:
+        release = api('releases', 'POST', {'tag_name': f'v{version}', 'target_commitish': 'main', 'name': f'PhD 科研工作台 v{version}', 'body': notes, 'draft': True, 'prerelease': False})
     paths = [workspace / 'release' / f'PhD-Research-Workbench-{version}-Setup.exe',
              workspace / 'test-results' / f'fixes-{version}' / 'update-assets' / f'PhD-Research-Workbench-{version}-Update.zip',
              workspace / 'test-results' / f'fixes-{version}' / 'update-assets' / 'latest-update.json']
     import http.client
     for path in paths:
-        connection = http.client.HTTPSConnection('uploads.github.com', timeout=300)
+        existing = next((item for item in release['assets'] if item['name'] == path.name), None)
+        if existing:
+            if existing['state'] == 'uploaded' and existing['size'] == path.stat().st_size:
+                print(f'ASSET_ALREADY_UPLOADED {path.name}', flush=True)
+                continue
+            raise RuntimeError(f'Incomplete existing asset: {path.name}')
+        if proxy_url:
+            proxy = urllib.parse.urlparse(proxy_url)
+            connection = http.client.HTTPSConnection(proxy.hostname, proxy.port, timeout=300)
+            connection.set_tunnel('uploads.github.com', 443)
+        else:
+            connection = http.client.HTTPSConnection('uploads.github.com', timeout=300)
         upload_path = f'/repos/{repository}/releases/{release["id"]}/assets?name={urllib.parse.quote(path.name)}'
         connection.putrequest('POST', upload_path)
         for key, value in {**headers, 'Content-Type': 'application/octet-stream', 'Content-Length': str(path.stat().st_size)}.items():
