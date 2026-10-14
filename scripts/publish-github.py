@@ -23,6 +23,8 @@ proxy_url = os.environ.get('WORKBENCH_PUBLISH_PROXY', '')
 headers = {'Authorization': f'Bearer {token}', 'Accept': 'application/vnd.github+json', 'User-Agent': 'PhD-Workbench-Publisher', 'X-GitHub-Api-Version': '2022-11-28'}
 
 def run_curl(args):
+    if os.name == 'nt':
+        args += ['--ssl-revoke-best-effort']
     config = '\n'.join(f'header = "{key}: {value}"' for key, value in headers.items())
     for attempt in range(5):
         response = subprocess.run(args, input=config.encode('utf-8'), capture_output=True)
