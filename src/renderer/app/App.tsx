@@ -1,5 +1,5 @@
 import { Component, lazy, Suspense, useEffect, type ErrorInfo, type ReactNode } from 'react'
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
+import { AnimatePresence, useReducedMotion } from 'motion/react'
 import { AlertCircle, Orbit } from 'lucide-react'
 import { useWorkbench } from '../stores/workbench'
 import { useTasks } from '../hooks/use-tasks'
@@ -19,6 +19,7 @@ import { useInterface } from '../stores/interface'
 import { useAssistant } from '../stores/assistant'
 import { AssistantDialog } from '../components/planner/AssistantDialog'
 import { GlobalSearch } from '../components/layout/GlobalSearch'
+import { WorkspaceTransition } from '../components/layout/WorkspaceTransition'
 
 const LiteratureWorkspace = lazy(() =>
   import('../components/literature/LiteratureWorkspace').then((m) => ({
@@ -189,17 +190,10 @@ function Workbench() {
           <Sidebar />
           <MetadataQueue />
           <div className="main-region">
-            <AnimatePresence initial={false} mode="wait">
-              <motion.div
-                className="workspace-stage"
-                key={workspaceKey}
-                initial={{ opacity: 0, y: reducedMotion ? 0 : 7 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: reducedMotion ? 0 : -4 }}
-                transition={{ duration: reducedMotion ? 0 : 0.18, ease: [0.22, 1, 0.36, 1] }}
-              >
+            <AnimatePresence initial={false} mode="popLayout">
+              <WorkspaceTransition key={workspaceKey} reduced={!!reducedMotion}>
                 {workspace}
-              </motion.div>
+              </WorkspaceTransition>
             </AnimatePresence>
             <AnimatePresence initial={false}>
               {section === 'planner' && task && <TaskInspector key="task-inspector" task={task} />}

@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { isCalendarDate } from './validation'
 import type { Paper, Project, Submission, Task } from '../shared/types'
-import type { CheckinEntry, ReportSnapshot, StipendEntry } from '../shared/reports'
+import { checkinAbsenceMinutes, type CheckinAbsenceEntry, type CheckinEntry, type ReportSnapshot, type StipendEntry } from '../shared/reports'
 import { localDay } from '../shared/arxiv'
 
 const day = z.string().refine(isCalendarDate, '请输入有效日期。')
@@ -13,6 +13,14 @@ export const stipendInputSchema = z.object({ receivedOn: day, amountCents: z.num
   source: z.string().trim().min(1, '请填写津贴来源。').max(120), notes: z.string().max(1000) }).strict()
 export const stipendListSchema = z.array(stipendInputSchema.extend({ id: z.string().uuid(), createdAt: z.iso.datetime() })).max(10000)
 export const readingDatesSchema = z.record(z.string().uuid(), day)
+const absenceFields = z.object({ kind: z.enum(['trip', 'leave']), startDate: day, endDate: day, notes: z.string().max(1000) }).strict()
+const absenceOrder = (item: { startDate: string; endDate: string }) => item.endDate >= item.startDate
+const absenceOrderMessage = { message: '结束日期不能早于开始日期。', path: ['endDate'] }
+export const checkinAbsenceInputSchema = absenceFields.refine(absenceOrder, absenceOrderMessage)
+export const checkinAbsenceListSchema = z.array(absenceFields.extend({ id: z.string().uuid(), createdAt: z.iso.datetime() }).refine(absenceOrder, absenceOrderMessage)).max(10000)
+export function checkinAbsenceForDate(absences: CheckinAbsenceEntry[], date: string) {
+  return absences.find(item => date >= item.startDate && date <= item.endDate)
+}
 const time = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, '请填写有效的开始和结束时间。')
 export function checkinDuration(start: string, end: string, nextDay = false): number {
   if (!time.safeParse(start).success || !time.safeParse(end).success) return 0
@@ -92,7 +100,13 @@ export function reportData(snapshot: ReportSnapshot, tasks: Task[], papers: Pape
   const published = papers.filter(paper => paper.collection === 'publication' && inside(paper.publishedDate, range))
   const receipts = snapshot.stipends.filter(item => inside(item.receivedOn, range))
   const checkins = snapshot.checkins.filter(item => checkinDayParts(item).some(part => inside(part.date, range)))
-  const checkinParts = checkins.flatMap(checkinDayParts).filter(part => inside(part.date, range))
+  const recordedParts = checkins.flatMap(checkinDayParts).filter(part => inside(part.date, range))
+  const absenceParts = rangeDays(range).flatMap(date => {
+    const absence = checkinAbsenceForDate(snapshot.absences, date)
+    return absence ? [{ date, minutes: checkinAbsenceMinutes, kind: absence.kind }] : []
+  })
+  // Absence dates reduce the target; they never create check-in records.
+  const checkinParts = recordedParts.filter(part => !checkinAbsenceForDate(snapshot.absences, part.date))
   const bucketCount = Math.round((new Date(`${range.end}T12:00:00`).getTime() - new Date(`${range.start}T12:00:00`).getTime()) / 86400000) + 1
   const bucketSize = bucketCount <= 7 ? 1 : bucketCount <= 35 ? 7 : Math.ceil(bucketCount / 12)
   const buckets: { start: string; end: string; label: string; papers: number; tasks: number; stipendCents: number; checkinMinutes: number }[] = []
@@ -112,6 +126,8 @@ export function reportData(snapshot: ReportSnapshot, tasks: Task[], papers: Pape
   }))
   return { read, completed, rounds, submitted, published, receipts, buckets, days, checkins,
     checkinMinutes: checkinParts.reduce((sum, item) => sum + item.minutes, 0), checkinDays: new Set(checkinParts.map(item => item.date)).size,
+    deductionMinutes: absenceParts.reduce((sum, item) => sum + item.minutes, 0),
+    tripDays: absenceParts.filter(item => item.kind === 'trip').length, leaveDays: absenceParts.filter(item => item.kind === 'leave').length,
     amountCents: receipts.reduce((sum, item) => sum + item.amountCents, 0),
     missingReading: literature.filter(paper => paper.readingStatus === 'done' && !snapshot.readingDates[paper.id]),
     allRead: literature.filter(paper => paper.readingStatus === 'done').length,

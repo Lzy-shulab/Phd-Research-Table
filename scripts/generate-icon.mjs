@@ -3,10 +3,11 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 const env = { ...process.env, WORKBENCH_DISABLE_ARXIV_AUTO: '1', WORKBENCH_DATA_DIR: resolve('test-results', 'icon-profile') }
 delete env.ELECTRON_RUN_AS_NODE
-const app = await electron.launch({ args: ['.'], env })
+const executablePath = process.env.WORKBENCH_TEST_EXECUTABLE || resolve('release/win-unpacked/PhD 科研工作台.exe')
+const app = await electron.launch({ executablePath, args: [], env })
 try {
   const page = await app.firstWindow()
-  await page.getByRole('heading', { name: 'Today', exact: true }).waitFor()
+  await page.getByRole('heading', { name: '今日计划', exact: true }).waitFor()
   const svg = readFileSync(resolve('resources/icon.svg'), 'utf8')
   const images = []
   for (const size of [16, 24, 32, 48, 64, 128, 256]) {

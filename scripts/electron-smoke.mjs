@@ -101,8 +101,7 @@ try {
   check('Clean first launch on Today; sandboxed renderer and typed preload')
   await screenshot('01-empty.png')
 
-  await page.getByText('更多选项', { exact: false }).first().click()
-  await page.getByRole('button', { name: '新建项目', exact: true }).click()
+  await page.getByLabel('新计划所属项目').selectOption({ label: '新建项目…' })
   await page.getByRole('textbox', { name: '项目名称' }).fill('PhD Thesis')
   await page
     .getByRole('textbox', { name: '描述', exact: true })
@@ -273,8 +272,7 @@ try {
   await page.getByRole('button', { name: '归档项目', exact: true }).click()
   await page.getByRole('button', { name: '管理项目 Thesis Research', exact: true }).click()
   await page.getByRole('button', { name: '恢复项目', exact: true }).click()
-  await page.getByText('更多选项', { exact: false }).first().click()
-  await page.getByRole('button', { name: '新建项目', exact: true }).click()
+  await page.getByLabel('新计划所属项目').selectOption({ label: '新建项目…' })
   await page.getByRole('textbox', { name: '项目名称' }).fill('Research continuation')
   await page.getByRole('button', { name: '创建项目', exact: true }).click()
   const receivingId = (await snapshot()).projects.find((p) => p.name === 'Research continuation').id

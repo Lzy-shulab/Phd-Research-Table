@@ -28,11 +28,6 @@ import { ScheduleGrid } from './ScheduleGrid'
 import { ProjectDialog } from '../projects/ProjectDialog'
 import { useInterface } from '../../stores/interface'
 import { ImportantCountdowns } from './ImportantCountdowns'
-import { useReducedMotion } from 'motion/react'
-import { gsap } from 'gsap'
-import { useGSAP } from '@gsap/react'
-
-gsap.registerPlugin(useGSAP)
 
 export function PlannerWorkspace() {
   const view = useWorkbench((s) => s.view)
@@ -49,15 +44,6 @@ export function PlannerWorkspace() {
   const plannerDisplay = useInterface((state) => state.preferences.plannerDisplay)
   const setPlannerDisplay = useInterface((state) => state.update)
   const capture = useRef<QuickCaptureHandle>(null)
-  const workspace = useRef<HTMLElement>(null)
-  const reducedMotion = useReducedMotion()
-  useGSAP(() => {
-    if (reducedMotion) return
-    gsap.timeline({ defaults: { duration: 0.26, ease: 'power2.out' } })
-      .from('.workspace-header > div', { y: 6, opacity: 0 })
-      .from('.quick-capture', { y: 5, opacity: 0 }, '-=0.18')
-      .from('.overdue-panel, .all-task-overview, .today-scope-summary', { y: 4, opacity: 0, stagger: 0.035 }, '-=0.16')
-  }, { scope: workspace, dependencies: [view, reducedMotion], revertOnUpdate: true })
   const tasks = useTasks(),
     now = useClock(),
     today = dateKey(now)
@@ -123,7 +109,7 @@ export function PlannerWorkspace() {
           ? '暂时没有未来任务。'
           : '这里还没有任务。'
   return (
-    <main className="planner-workspace" ref={workspace}>
+    <main className="planner-workspace">
       <header className="workspace-header">
         <div>
           <div className="workspace-breadcrumb">

@@ -8,6 +8,7 @@ import { AppearanceSettings } from './AppearanceSettings'
 import { AssistantSettings } from './AssistantSettings'
 import { UpdateSettings } from './UpdateSettings'
 import { TranslationSettings } from '../literature/TranslationSettings'
+import { SettingsHeading } from './SettingsHeading'
 
 const locations = [
   { kind: 'library', label: '文献 PDF', description: '保存手动导入的文献及对应译文。', icon: Library },
@@ -73,10 +74,10 @@ export function SettingsWorkspace() {
     <div className="settings-body">
       <AppearanceSettings />
       <AssistantSettings />
-      <section className="storage-section translation-settings-entry"><div className="storage-section-heading"><Languages size={19} /><div><h2>全文翻译配置</h2><p>单独选择 PDF2zh 引擎、服务和模型；与计划助手配置互不覆盖。</p></div></div><Button onClick={() => setTranslationSettings(true)}>打开全文翻译设置</Button></section>
+      <section className="storage-section translation-settings-entry settings-action-card"><SettingsHeading icon={Languages} title="全文翻译配置"><p>单独选择 PDF2zh 引擎、服务和模型；与计划助手配置互不覆盖。</p></SettingsHeading><Button onClick={() => setTranslationSettings(true)}>打开全文翻译设置</Button></section>
       <UpdateSettings />
       <section className="storage-section" id="storage-settings" aria-labelledby="storage-heading">
-        <div className="storage-section-heading"><HardDrive size={19} /><div><h2 id="storage-heading">保存位置</h2><p>选择后自动保存，下次打开工作台继续使用。</p></div></div>
+        <SettingsHeading icon={HardDrive} title="保存位置" id="storage-heading"><p>选择后自动保存，下次打开工作台继续使用。</p></SettingsHeading>
         <div className="storage-list">
           {locations.map(({ kind, label, description, icon: Icon }) => <div className="storage-row" key={kind} data-testid={`storage-${kind}`}>
             <div className="storage-row-heading"><span className="storage-icon"><Icon size={20} strokeWidth={1.6} /></span><div><h3>{label}</h3><p>{description}</p></div></div>

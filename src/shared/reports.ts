@@ -16,4 +16,9 @@ export interface CheckinEntry {
   startTime?: string; endTime?: string; endsNextDay?: boolean
 }
 export interface CheckinInput { date: string; startTime: string; endTime: string; endsNextDay: boolean; notes: string }
-export interface ReportSnapshot { settings: ReportSettings; stipends: StipendEntry[]; readingDates: Record<string, string>; checkins: CheckinEntry[] }
+export type CheckinAbsenceKind = 'trip' | 'leave'
+export interface CheckinAbsenceInput { kind: CheckinAbsenceKind; startDate: string; endDate: string; notes: string }
+export interface CheckinAbsenceEntry extends CheckinAbsenceInput { id: string; createdAt: string }
+export const checkinAbsenceLabels: Record<CheckinAbsenceKind, string> = { trip: '出差', leave: '休假' }
+export const checkinAbsenceMinutes = 12 * 60
+export interface ReportSnapshot { settings: ReportSettings; stipends: StipendEntry[]; readingDates: Record<string, string>; checkins: CheckinEntry[]; absences: CheckinAbsenceEntry[] }

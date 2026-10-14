@@ -1,8 +1,9 @@
-import { Orbit, LockKeyhole, PanelLeft } from 'lucide-react'
+import { LockKeyhole, PanelLeft } from 'lucide-react'
 import { useWorkbench } from '../../stores/workbench'
 import { DailyEncouragement } from './DailyEncouragement'
 import { version } from '../../../../package.json'
 import { useInterface } from '../../stores/interface'
+import brandIcon from '../../../../resources/icon.svg'
 export function Titlebar() {
   const errors = useWorkbench((s) => s.saveErrors)
   const firstError = Object.keys(errors)[0]
@@ -12,7 +13,7 @@ export function Titlebar() {
     <header className="titlebar">
       <div className="app-brand">
         <button className="titlebar-sidebar-toggle" aria-label={collapsed ? '展开侧栏' : '收起侧栏'} title={collapsed ? '展开侧栏' : '收起侧栏'} onClick={() => void updateInterface({ sidebarCollapsed: !collapsed })}><PanelLeft size={16} /></button>
-        <Orbit size={19} strokeWidth={1.6} />
+        <img className="app-brand-icon" src={brandIcon} alt="" aria-hidden="true" />
         <span>
           PhD <span className="brand-light">科研工作台</span>
         </span>

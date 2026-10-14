@@ -3,8 +3,8 @@ import { eq } from 'drizzle-orm'
 import type { WorkbenchDatabase } from '../db'
 import { appSettings } from '../schema'
 import { DomainError } from '../../../domain/errors'
-import { defaultReportSettings, type ReportSettings, type ReportSnapshot, type StipendInput, type CheckinInput } from '../../../shared/reports'
-import { readingDateInputSchema, readingDatesSchema, reportSettingsSchema, stipendInputSchema, stipendListSchema, checkinInputSchema, checkinListSchema, checkinDuration, checkinDayParts } from '../../../domain/reports'
+import { defaultReportSettings, type ReportSettings, type ReportSnapshot, type StipendInput, type CheckinInput, type CheckinAbsenceInput } from '../../../shared/reports'
+import { readingDateInputSchema, readingDatesSchema, reportSettingsSchema, stipendInputSchema, stipendListSchema, checkinInputSchema, checkinListSchema, checkinDuration, checkinDayParts, checkinAbsenceInputSchema, checkinAbsenceListSchema } from '../../../domain/reports'
 import { LibraryRepository } from './library'
 
 export const readingDatesKey = 'research.reading-dates.v1'
@@ -23,7 +23,8 @@ export class ReportsRepository {
   snapshot(): ReportSnapshot {
     try { return { settings: reportSettingsSchema.parse(this.read('research.settings.v1') ?? structuredClone(defaultReportSettings)),
       stipends: stipendListSchema.parse(this.read('research.stipends.v1') ?? []), readingDates: readingDatesSchema.parse(this.read(readingDatesKey) ?? {}),
-      checkins: checkinListSchema.parse(this.read('research.checkins.v1') ?? []) } }
+      checkins: checkinListSchema.parse(this.read('research.checkins.v1') ?? []),
+      absences: checkinAbsenceListSchema.parse(this.read('research.checkin-absences.v1') ?? []) } }
     catch { throw new DomainError('VALIDATION', '报表记录无法读取，原记录已保留。') }
   }
   settings(input: ReportSettings) {
@@ -64,6 +65,18 @@ export class ReportsRepository {
     return item
   }
   deleteCheckin(id: string) { this.write('research.checkins.v1', this.snapshot().checkins.filter(item => item.id !== id)) }
+  saveCheckinAbsence(input: CheckinAbsenceInput, id?: string) {
+    const parsed = checkinAbsenceInputSchema.parse(input), entries = this.snapshot().absences
+    const previous = entries.find(item => item.id === id)
+    if (id && !previous) throw new DomainError('NOT_FOUND', '此出差或休假记录已不存在。')
+    if (entries.some(item => item.id !== id && parsed.startDate <= item.endDate && parsed.endDate >= item.startDate)) {
+      throw new DomainError('VALIDATION', '这些日期已有出差或休假记录，请编辑原记录或调整日期。')
+    }
+    const item = { ...parsed, id: previous?.id ?? randomUUID(), createdAt: previous?.createdAt ?? new Date().toISOString() }
+    this.write('research.checkin-absences.v1', checkinAbsenceListSchema.parse(previous ? entries.map(old => old.id === id ? item : old) : [...entries, item]))
+    return item
+  }
+  deleteCheckinAbsence(id: string) { this.write('research.checkin-absences.v1', this.snapshot().absences.filter(item => item.id !== id)) }
   readingDate(input: { paperId: string; date: string }) {
     const parsed = readingDateInputSchema.parse(input), paper = new LibraryRepository(this.db).paper(parsed.paperId)
     if (paper.collection === 'publication' || paper.readingStatus !== 'done') throw new DomainError('VALIDATION', '请先将文献标记为已读。')

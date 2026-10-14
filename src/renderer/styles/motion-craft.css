@@ -1,0 +1,51 @@
+/* Quiet continuity, precise icon relief, and immediate control feedback. */
+:root { --motion-feedback: 110ms; --motion-settle: 280ms; --motion-depart: 130ms; }
+.main-region { position: relative; }
+.workspace-stage { width: 100%; height: 100%; flex: 1; display: flex; min-height: 0; }
+.workspace-stage[inert] { pointer-events: none; }
+.app-brand-icon { width: 26px; height: 26px; flex-shrink: 0; object-fit: contain; filter: drop-shadow(0 1px 2px color-mix(in srgb, var(--shadow-ink) 16%, transparent)); }
+.workspace-glyph { --glyph-ink: var(--accent); display: inline-grid; place-items: center; width: 30px; height: 30px; flex-shrink: 0; border-radius: 9px; color: var(--glyph-ink); background: color-mix(in srgb, var(--glyph-ink) 9%, var(--surface-raised)); box-shadow: inset 0 1px 0 var(--glass-highlight), inset 0 -1px 0 color-mix(in srgb, var(--glyph-ink) 12%, transparent), 0 2px 4px color-mix(in srgb, var(--shadow-ink) 7%, transparent); transition: color 180ms var(--motion-ease), background-color 180ms var(--motion-ease), transform var(--motion-settle) var(--motion-ease), box-shadow var(--motion-settle) var(--motion-ease); }
+.workspace-glyph > svg { display: block; flex-shrink: 0; }
+.glyph-literature { --glyph-ink: var(--action-companion); }
+.glyph-outputs { --glyph-ink: var(--action-positive); }
+.glyph-submissions { --glyph-ink: var(--action-warm); }
+.glyph-settings { --glyph-ink: var(--text-secondary); }
+.sidebar-module { gap: 10px; min-height: 36px; }
+.sidebar-module .workspace-glyph { width: 32px; height: 32px; }
+.dock-item { width: clamp(116px, 9vw, 138px); min-height: 48px; padding: 8px 10px; gap: 8px; transition: color 180ms var(--motion-ease), background-color 180ms var(--motion-ease), scale var(--motion-feedback) var(--motion-ease); }
+.dock-item.selected .workspace-glyph { color: var(--on-accent); background: color-mix(in srgb, var(--on-accent) 14%, transparent); box-shadow: inset 0 1px 0 color-mix(in srgb, var(--on-accent) 20%, transparent), 0 2px 4px color-mix(in srgb, var(--shadow-ink) 12%, transparent); transform: scale(1.03); }
+.dock-item:hover:not(.selected) .workspace-glyph { transform: translateY(-1px); box-shadow: inset 0 1px 0 var(--glass-highlight), 0 3px 7px color-mix(in srgb, var(--shadow-ink) 12%, transparent); }
+.dock-item:active .workspace-glyph { transform: scale(.97); }
+.dock-wrap { transition: transform 360ms var(--motion-ease); }
+.button { transition: background-color 170ms var(--motion-ease), color 170ms var(--motion-ease), border-color 170ms var(--motion-ease), box-shadow 220ms var(--motion-ease), scale var(--motion-feedback) var(--motion-ease), translate var(--motion-feedback) var(--motion-ease); }
+.button:active:not(:disabled) { scale: .98; translate: 0 1px; }
+.button-primary:active:not(:disabled) { box-shadow: inset 0 1px 3px color-mix(in srgb, var(--shadow-ink) 18%, transparent), 0 1px 2px color-mix(in srgb, var(--accent) 12%, transparent); }
+:is(.button, .sidebar-link, .row-more, .titlebar-sidebar-toggle) > svg { stroke-width: 1.75; }
+:is(.button, .sidebar-link, .row-more) > svg { transition: color 170ms var(--motion-ease), opacity 170ms var(--motion-ease), transform 220ms var(--motion-ease); }
+.task-checkbox { transition: background-color 180ms var(--motion-ease), border-color 180ms var(--motion-ease), color 180ms var(--motion-ease), box-shadow 180ms var(--motion-ease), scale var(--motion-feedback) var(--motion-ease); }
+.task-checkbox:active { scale: .9; }
+.task-checkbox[aria-checked='true'] > svg { animation: craft-check-in 200ms var(--motion-ease); }
+.task-checkbox[aria-checked='true'] > svg path { stroke-dasharray: 24; stroke-dashoffset: 0; animation: craft-check-stroke 220ms var(--motion-ease); }
+.dialog-content { transition: none; }
+.dialog-overlay[data-state='open'] { animation: workspace-overlay-in 180ms var(--motion-ease) both; }
+.dialog-overlay[data-state='closed'] { animation: workspace-overlay-out var(--motion-depart) ease-in both; }
+.dialog-content[data-state='open'] { animation: craft-dialog-in 280ms var(--motion-ease) both; }
+.dialog-content[data-state='closed'] { animation: craft-dialog-out var(--motion-depart) ease-in both; }
+.select-content { animation: craft-menu-in 180ms var(--motion-ease) both; }
+.toast { animation: none; }
+@keyframes craft-check-in { from { opacity: .4; scale: .7; } to { opacity: 1; scale: 1; } }
+@keyframes craft-check-stroke { from { stroke-dashoffset: 24; } to { stroke-dashoffset: 0; } }
+@keyframes craft-dialog-in { from { opacity: 0; transform: translate(-50%, calc(-50% + 10px)) scale(.975); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
+@keyframes craft-dialog-out { from { opacity: 1; transform: translate(-50%, -50%) scale(1); } to { opacity: 0; transform: translate(-50%, calc(-50% + 4px)) scale(.99); } }
+@keyframes craft-menu-in { from { opacity: 0; translate: 0 -3px; } to { opacity: 1; translate: 0 0; } }
+@media (max-width: 1200px) { .dock-item { width: 116px; padding-inline: 8px; gap: 7px; } }
+:root[data-text-size='18'] .dock-item { width: 138px; }
+@media (prefers-reduced-motion: reduce) {
+  .workspace-glyph, .dock-wrap { transition: none; }
+  .dock-item.selected .workspace-glyph, .dock-item:hover:not(.selected) .workspace-glyph, .dock-item:active .workspace-glyph { transform: none; }
+  .button:active:not(:disabled), .task-checkbox:active { scale: 1; translate: none; }
+  .task-checkbox[aria-checked='true'] > svg, .task-checkbox[aria-checked='true'] > svg path { animation: none; }
+  .dialog-content[data-state='open'] { animation: workspace-overlay-in 80ms linear both; }
+  .dialog-content[data-state='closed'] { animation: workspace-overlay-out 60ms linear both; }
+  .select-content { animation: workspace-overlay-in 80ms linear both; }
+}

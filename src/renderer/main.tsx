@@ -18,6 +18,7 @@ import './styles/reports.css'
 import './styles/workspace-rhythm.css'
 import './styles/experience.css'
 import './styles/glass-upgrade.css'
+import './styles/motion-craft.css'
 import { MotionConfig } from 'motion/react'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

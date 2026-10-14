@@ -13,10 +13,10 @@ export function ReportGoalCard({ metric, snapshot, tasks, papers, projects }: {
   const data = reportData(snapshot, tasks, papers, [], projects, range)
   const label = metric === 'papers' ? '读完论文' : metric === 'tasks' ? '完成任务' : '打卡时长'
   const value = metric === 'papers' ? data.read.length : metric === 'tasks' ? data.completed.length : data.checkinMinutes
-  const target = workdayTarget(range)
+  const target = workdayTarget(range, snapshot.absences)
   const goal = metric === 'checkinMinutes' ? target.minutes : snapshot.settings.goals[selection.period][metric]
   const goalText = metric === 'checkinMinutes'
-    ? target.known ? `目标 ${formatDuration(goal)} · ${target.days} 个工作日 × 12 小时` : '该年份节假日资料未收录，目标待计算'
+    ? target.known ? `目标 ${formatDuration(goal)} · ${target.days} 个工作日 × 12 小时${target.deductionMinutes ? ` − 出差/休假 ${formatDuration(target.deductionMinutes)}` : ''}` : '该年份节假日资料未收录，目标待计算'
     : goal ? `目标 ${goal} ${metric === 'papers' ? '篇' : '项'}` : '未设置目标'
   return <article className="report-goal" aria-label={label}>
     <h2>{label}</h2>

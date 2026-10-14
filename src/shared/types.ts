@@ -104,6 +104,8 @@ export type ErrorCode = 'VALIDATION' | 'NOT_FOUND' | 'DATABASE' | 'UNAVAILABLE' 
 export type Result<T> =
   { ok: true; data: T } | { ok: false; error: { code: ErrorCode; message: string } }
 export interface WorkbenchApi {
+  saveCheckinAbsence: (input: import('./reports').CheckinAbsenceInput, id?: string) => Promise<Result<import('./reports').CheckinAbsenceEntry>>
+  deleteCheckinAbsence: (id: string) => Promise<Result<void>>
   saveCheckin: (input: import('./reports').CheckinInput, id?: string) => Promise<Result<import('./reports').CheckinEntry>>
   deleteCheckin: (id: string) => Promise<Result<void>>
   researchReport: () => Promise<Result<import('./reports').ReportSnapshot>>

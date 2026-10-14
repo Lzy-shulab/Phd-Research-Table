@@ -4,6 +4,7 @@ import type { Result } from '../../../shared/types'
 import type { UpdateSnapshot } from '../../../shared/update'
 import { useWorkbench } from '../../stores/workbench'
 import { Button } from '../ui/button'
+import { SettingsHeading } from './SettingsHeading'
 
 function unwrap<T>(result: Result<T>): T {
   if (!result.ok) throw new Error(result.error.message)
@@ -38,22 +39,19 @@ export function UpdateSettings() {
   }
   const busy = snapshot ? pendingStates.has(snapshot.state) : true
   const buttonLabel = snapshot?.state === 'ready'
-    ? '安装更新'
+    ? '重启并更新'
     : snapshot?.state === 'checking'
       ? '正在检查…'
       : snapshot?.state === 'downloading'
         ? snapshot.progress === null ? '正在下载…' : `正在下载 ${snapshot.progress}%`
         : snapshot?.state === 'installing'
-          ? '正在退出…'
+          ? '正在更新…'
           : '检查并下载更新'
   const Icon = snapshot?.state === 'ready' ? CheckCircle2 : snapshot?.state === 'downloading' ? Download : RefreshCw
-  return <section className="update-settings" aria-labelledby="update-heading">
-    <div className="update-copy">
-      <span className="update-icon"><ShieldCheck size={20} strokeWidth={1.7} /></span>
-      <div><h2 id="update-heading">软件更新</h2>
+  return <section className="update-settings settings-action-card" aria-labelledby="update-heading">
+    <SettingsHeading icon={ShieldCheck} title="软件更新" id="update-heading">
         {(error || snapshot?.message) && <p className={error ? 'field-error update-message' : 'update-message'} role={error ? 'alert' : 'status'}>{error || snapshot?.message}</p>}
-      </div>
-    </div>
+    </SettingsHeading>
     <Button disabled={busy} onClick={() => void act()} aria-label={buttonLabel}>
       <Icon size={15} className={busy ? 'spin-when-busy' : undefined} />{buttonLabel}
     </Button>

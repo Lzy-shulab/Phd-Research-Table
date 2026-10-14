@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { motion } from 'motion/react'
+import { motion, useReducedMotion } from 'motion/react'
 import {
   CalendarDays,
   Check,
@@ -24,8 +24,10 @@ import { DateInput } from '../ui/date-input'
 import { TimeInput } from '../ui/time-input'
 import { useLibrary } from '../../stores/library'
 import { useSubmissions } from '../../stores/submissions'
+import { settleSpring, departureEase } from '../../lib/motion'
 
 export function TaskInspector({ task }: { task: Task }) {
+  const reduced = useReducedMotion()
   const projects = useWorkbench((s) => s.projects)
   const edit = useWorkbench((s) => s.editTask)
   const flush = useWorkbench((s) => s.flushTask)
@@ -43,7 +45,7 @@ export function TaskInspector({ task }: { task: Task }) {
   const linkedPaper = useLibrary((state) => state.papers.find((paper) => paper.id === task.linkedPaperId))
   const linkedSubmission = useSubmissions((state) => state.submissions.find((submission) => submission.id === task.linkedSubmissionId))
   return (
-    <motion.aside className="task-inspector" aria-label="任务详情" initial={{ x: 30, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 30, opacity: 0 }}>
+    <motion.aside className="task-inspector" aria-label="任务详情" initial={{ x: reduced ? 0 : 18, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={reduced ? { duration: 0.08 } : settleSpring} exit={{ x: reduced ? 0 : 12, opacity: 0, transition: { duration: reduced ? 0.08 : 0.14, ease: departureEase } }}>
       <div className="inspector-top">
         <span className="eyebrow">任务详情</span>
         <Button

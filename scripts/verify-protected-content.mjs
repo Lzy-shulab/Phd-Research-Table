@@ -41,14 +41,23 @@ const timer = setInterval(() => {
   clearInterval(timer)
   try {
     const after = capture()
-    assert.deepEqual(after.tables, before.tables, 'Database content changed')
-    assert.deepEqual(after.files.map(file => file.path), before.files.map(file => file.path), 'Referenced file list changed')
-    for (let index = 0; index < before.files.length; index++) {
-      const a = before.files[index], b = after.files[index]
-      assert.ok(a.bytes === null ? b.bytes === null : b.bytes !== null && a.bytes.equals(b.bytes), `File content changed: ${a.path}`)
-    }
-    const result = { state: 'verified', integrity: 'ok', tablesAndSettingsUnchanged: true, referencedFilesAndBackgroundsUnchanged: true, filesCompared: before.files.length }
+    const oldTables = new Map(before.tables.map(table => [table.name, table.rows]))
+    const newTables = new Map(after.tables.map(table => [table.name, table.rows]))
+    const changedTables = [...new Set([...oldTables.keys(), ...newTables.keys()])].filter(name => JSON.stringify(oldTables.get(name)) !== JSON.stringify(newTables.get(name)))
+    const settings = tables => new Map((tables.find(table => table.name === 'app_settings')?.rows ?? []).map(row => { const item = JSON.parse(row); return [item.key, item.value] }))
+    const oldSettings = settings(before.tables), newSettings = settings(after.tables)
+    const changedSettings = [...new Set([...oldSettings.keys(), ...newSettings.keys()])].filter(key => oldSettings.get(key) !== newSettings.get(key))
+    const oldFiles = new Map(before.files.map(file => [file.path, file.bytes])), newFiles = new Map(after.files.map(file => [file.path, file.bytes]))
+    const changedFiles = [...new Set([...oldFiles.keys(), ...newFiles.keys()])].filter(path => {
+      if (!oldFiles.has(path) || !newFiles.has(path)) return true
+      const a = oldFiles.get(path), b = newFiles.get(path)
+      return a === null ? b !== null : b === null || !a.equals(b)
+    })
+    const result = { state: changedTables.length || changedFiles.length ? 'changed' : 'verified', integrity: 'ok',
+      tablesAndSettingsUnchanged: !changedTables.length, referencedFilesAndBackgroundsUnchanged: !changedFiles.length,
+      filesCompared: before.files.length, changedTables, changedSettings, changedFilesCount: changedFiles.length }
     writeFileSync(join(evidence, 'result.json'), JSON.stringify(result, null, 2))
     console.log(JSON.stringify(result))
-  } catch (error) { console.error(error.message); process.exitCode = 1 }
+    if (result.state === 'changed') process.exitCode = 1
+  } catch (error) { console.error(error.code === 'ERR_ASSERTION' ? 'Read-only integrity or reference check did not pass.' : error.message); process.exitCode = 1 }
 }, 1000)

@@ -251,6 +251,22 @@
 .report-row-actions .button { padding: 4px; min-width: 26px; min-height: 28px; }
 .report-checkin-row p { font-size: .78rem; overflow-wrap: anywhere; margin: 0; }
 .report-panel .report-day-empty { padding: 9px 0; font-size: .82rem; }
+.report-checkin-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+#report-checkins > header { flex-wrap: wrap; }
+#report-checkins .report-panel-actions { flex-wrap: wrap; }
+.report-absence-summary { font-size: .8rem; line-height: 1.7; color: var(--text-secondary); margin: -8px 0 22px; }
+.report-absence-summary strong { font-weight: 550; color: var(--text-primary); }
+.report-absence-form select { width: 100%; min-width: 0; }
+.report-absence-form .report-entry-notice { margin: 0; font-size: .8rem; line-height: 1.65; color: var(--text-secondary); }
+.report-absence-records { margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--border-default); }
+.report-absence-records h3 { display: flex; justify-content: space-between; gap: 8px; font-size: .86rem; margin-bottom: 8px; }
+.report-absence-records h3 span { font-weight: 400; color: var(--text-secondary); }
+.report-absence-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border-subtle); }
+.report-absence-row > div:first-child { display: grid; gap: 4px; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.report-absence-row strong { font-size: .85rem; font-weight: 550; font-variant-numeric: tabular-nums; }
+.report-absence-row span { font-size: .78rem; color: var(--text-secondary); }
+.report-day-badge.is-trip { color: var(--action-companion); background: var(--surface-companion); }
+.report-day-badge.is-leave { color: var(--action-warm); background: var(--surface-warm); }
 .report-activity-projects { border-left: 0; border-top: 1px solid var(--border-subtle); padding: 18px 0 0; margin-top: 20px; }
 .report-activity-projects .report-project-bars { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px 24px; max-height: 150px; margin-top: 14px; overflow: auto; scrollbar-gutter: stable; }
 .report-activity-projects .report-project-bars > div { min-width: 0; }

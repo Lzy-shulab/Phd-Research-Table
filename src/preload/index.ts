@@ -3,6 +3,8 @@ import type { WorkbenchApi } from '../shared/types'
 
 // The renderer gets a fixed capability list, never ipcRenderer or a generic invoke.
 const api: WorkbenchApi = {
+  saveCheckinAbsence: (input, id) => ipcRenderer.invoke('reports:absence-save', input, id),
+  deleteCheckinAbsence: id => ipcRenderer.invoke('reports:absence-delete', id),
   saveCheckin: (input, id) => ipcRenderer.invoke('reports:checkin-save', input, id),
   deleteCheckin: id => ipcRenderer.invoke('reports:checkin-delete', id),
   researchReport: () => ipcRenderer.invoke('reports:snapshot'),

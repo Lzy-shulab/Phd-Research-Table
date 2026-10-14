@@ -36,6 +36,8 @@ $archiveEntries = @(
   @{ Relative = 'node_modules\.vite\vitest'; Reason = '本轮单元测试结果缓存，可重新生成' },
   @{ Relative = "release-stage-$Version"; Reason = '正式产物移入 release 后剩余的临时打包文件' }
   @{ Relative = "release-stage-$Version-final"; Reason = '正式产物移入 release 后剩余的最终打包文件' }
+  @{ Relative = "release-stage-$Version-updater-fixed"; Reason = '正式产物移入 release 后剩余的更新流程打包文件' }
+  @{ Relative = "release-stage-$Version-ready"; Reason = '正式产物移入 release 后剩余的最终更新流程打包文件' }
   @{ Relative = "release-stage-$Version-before-scroll-fix"; Reason = '拖选自动滚动修正前的临时程序和安装包，正式版已替换' }
   @{ Relative = '验收记录'; Reason = '本轮可重新生成的验收材料' }
   @{ Relative = 'src\renderer\styles\sky.css'; Reason = '用户要求移除的晴空主题样式，已从构建中移除' }

@@ -2,8 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { ChevronLeft, ChevronRight, Plus, Settings2, Trash2, Pencil, Clock3, Activity, BookOpen, ListChecks } from 'lucide-react'
 import { localDay } from '../../../shared/arxiv'
-import { defaultReportSettings, type GoalMetric, type ReportSettings, type ReportSnapshot, type StipendEntry, type CheckinEntry } from '../../../shared/reports'
-import { reportData, reportSettingsSchema, checkinDuration, checkinDayParts, formatDuration, stipendYear } from '../../../domain/reports'
+import { checkinAbsenceLabels, defaultReportSettings, type GoalMetric, type ReportSettings, type ReportSnapshot, type StipendEntry, type CheckinEntry, type CheckinAbsenceEntry, type CheckinAbsenceKind } from '../../../shared/reports'
+import { reportData, reportSettingsSchema, checkinDuration, checkinDayParts, formatDuration, stipendYear, checkinAbsenceForDate } from '../../../domain/reports'
 import { workdayTarget } from '../../../domain/work-calendar'
 import type { Result } from '../../../shared/types'
 import { useWorkbench } from '../../stores/workbench'
@@ -17,6 +17,7 @@ import { ReportPeriodPicker } from './ReportPeriodPicker'
 import { useReportPeriod } from '../../hooks/use-report-period'
 import { ReportGoalCard } from './ReportGoalCard'
 import { ReportDayDetails } from './ReportDayDetails'
+import { CheckinAbsenceForm } from './CheckinAbsenceForm'
 
 const money = (cents: number) => (cents / 100).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 type VisibleMetric = Extract<GoalMetric, 'tasks' | 'papers' | 'checkinMinutes'>
@@ -27,7 +28,7 @@ export function ReportsWorkspace() {
   const projects = useWorkbench(state => state.projects)
   const tasks = useTasks(), papers = useLibrary(state => state.papers)
   const now = useClock()
-  const [snapshot, setSnapshot] = useState<ReportSnapshot>({ settings: structuredClone(defaultReportSettings), stipends: [], readingDates: {}, checkins: [] })
+  const [snapshot, setSnapshot] = useState<ReportSnapshot>({ settings: structuredClone(defaultReportSettings), stipends: [], readingDates: {}, checkins: [], absences: [] })
   const [loaded, setLoaded] = useState(false), [error, setError] = useState(''), [busy, setBusy] = useState(false)
   const activityPeriod = useReportPeriod(), checkinPeriod = useReportPeriod()
   const [activityMetric, setActivityMetric] = useState<'papers' | 'tasks'>('papers')
@@ -36,7 +37,8 @@ export function ReportsWorkspace() {
   const [stipendOpen, setStipendOpen] = useState(false), [stipend, setStipend] = useState<StipendEntry | null>(null)
   const [stipendManagerOpen, setStipendManagerOpen] = useState(false)
   const [checkinOpen, setCheckinOpen] = useState(false), [checkin, setCheckin] = useState<CheckinEntry | null>(null)
-  const [deleteItem, setDeleteItem] = useState<{ kind: 'stipend' | 'checkin'; id: string } | null>(null)
+  const [absenceKind, setAbsenceKind] = useState<CheckinAbsenceKind | null>(null), [absence, setAbsence] = useState<CheckinAbsenceEntry | null>(null)
+  const [deleteItem, setDeleteItem] = useState<{ kind: 'stipend' | 'checkin' | 'absence'; id: string } | null>(null)
   const [activityDay, setActivityDay] = useState(''), [checkinDay, setCheckinDay] = useState('')
   const libraryError = useLibrary(state => state.loadError)
   const load = useCallback(async () => {
@@ -52,10 +54,12 @@ export function ReportsWorkspace() {
   }
   const data = reportData(snapshot, tasks, papers, [], projects, activityPeriod.range)
   const checkinData = reportData(snapshot, tasks, papers, [], projects, checkinPeriod.range)
-  const checkinTarget = workdayTarget(checkinPeriod.range)
+  const checkinTarget = workdayTarget(checkinPeriod.range, snapshot.absences)
+  const periodAbsences = snapshot.absences.filter(item => item.startDate <= checkinPeriod.range.end && item.endDate >= checkinPeriod.range.start).sort((a, b) => a.startDate.localeCompare(b.startDate))
   const selectedActivity = data.days.some(day => day.date === activityDay) ? activityDay : [...data.days].reverse().find(day => day.papers || day.tasks)?.date ?? data.days.find(day => day.date === localDay(now))?.date ?? activityPeriod.range.start
   const selectedCheckin = checkinData.days.some(day => day.date === checkinDay) ? checkinDay : [...checkinData.days].reverse().find(day => day.checkinMinutes)?.date ?? checkinData.days.find(day => day.date === localDay(now))?.date ?? checkinPeriod.range.start
   const recordsForDay = (date: string) => checkinData.checkins.filter(entry => checkinDayParts(entry).some(part => part.date === date))
+  const openAbsence = (kind: CheckinAbsenceKind, entry: CheckinAbsenceEntry | null = null) => { setAbsence(entry); setAbsenceKind(kind); setCheckinOpen(false); if (entry) document.getElementById('report-checkins')?.scrollIntoView({ block: 'start' }) }
   const finance = stipendYear(snapshot.stipends, financeYear)
   const openSettings = () => { setSettingsDraft(structuredClone(snapshot.settings.projectsConfigured ? snapshot.settings : { ...snapshot.settings, projectIds: projects.map(project => project.id), includeUnassigned: true })); setSettingsOpen(!settingsOpen) }
   return <main className="reports-workspace">
@@ -64,7 +68,7 @@ export function ReportsWorkspace() {
       {error && <div className="report-error" role="alert"><span>{error}</span>{!loaded && <Button onClick={() => void load()}>重新读取</Button>}</div>}
       {!loaded ? <p role="status">正在读取报表…</p> : <>
       <AnimatePresence initial={false}>{settingsOpen && <motion.form initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="report-settings report-panel" onSubmit={event => { event.preventDefault(); const parsed = reportSettingsSchema.safeParse({ ...settingsDraft, projectsConfigured: true }); if (!parsed.success) { setError(parsed.error.issues[0]?.message ?? '请检查目标。'); return }; void act(() => window.workbench.saveReportSettings(parsed.data)).then(ok => { if (ok) setSettingsOpen(false) }) }}>
-        <h2>目标与项目</h2><p>任务与阅读目标按周、月分别设置；填 0 表示暂不设置。打卡目标按官方工作日 × 12 小时计算，包含调休上班日，排除假期与普通周末。</p>
+        <h2>目标与项目</h2><p>任务与阅读目标按周、月分别设置；填 0 表示暂不设置。打卡目标按官方工作日 × 12 小时计算，包含调休上班日，排除法定假期与普通周末；登记的出差和休假日期每天从周、月目标中扣除 12 小时，周末和节假日同样扣除。</p>
         <fieldset><legend>任务统计项目</legend><div className="report-project-options">{projects.map(project => <label key={project.id}><input type="checkbox" checked={settingsDraft.projectIds.includes(project.id)} onChange={event => setSettingsDraft({ ...settingsDraft, projectIds: event.target.checked ? [...settingsDraft.projectIds, project.id] : settingsDraft.projectIds.filter(id => id !== project.id) })} />{project.name}</label>)}<label><input type="checkbox" checked={settingsDraft.includeUnassigned} onChange={event => setSettingsDraft({ ...settingsDraft, includeUnassigned: event.target.checked })} />未分配项目的任务</label></div></fieldset>
         <div className="report-goal-inputs">{(['week', 'month'] as const).map(scope => <fieldset key={scope}><legend>{scope === 'week' ? '每周目标' : '每月目标'}</legend>{(['tasks', 'papers'] as const).map(metric => <label className="field" key={metric}>{labels[metric]}（{units[metric]}）<input type="number" min="0" max={100000} step={1} aria-label={`${scope === 'week' ? '每周' : '每月'}${labels[metric]}目标`} value={settingsDraft.goals[scope][metric]} onChange={event => setSettingsDraft({ ...settingsDraft, goals: { ...settingsDraft.goals, [scope]: { ...settingsDraft.goals[scope], [metric]: Number(event.target.value) } } })} /></label>)}</fieldset>)}</div>
         <div className="report-form-actions"><Button type="submit" variant="primary" disabled={busy}>保存目标与项目</Button><Button disabled={busy} onClick={() => setSettingsOpen(false)}>取消</Button></div>
@@ -86,13 +90,16 @@ export function ReportsWorkspace() {
         {data.projectBreakdown.length > 0 && <div className="report-projects report-activity-projects"><h3>本期任务分布 <span>{data.completed.length} 项</span></h3><div className="report-project-bars">{data.projectBreakdown.map(project => <div key={project.id}><span>{project.title}</span><strong>{project.completed} 项 · {Math.round(project.completed / data.completed.length * 100)}%</strong><progress aria-label={project.title + '任务占比'} max={data.completed.length} value={project.completed} /></div>)}</div></div>}
         {data.missingReading.length > 0 && <p className="report-source-note">另有 {data.missingReading.length} 篇历史已读文献未记录完成日期，未纳入日期分布。此后标记已读会自动同步。</p>}
       </section>
-      <section className="report-panel" id="report-checkins"><header><div><h2><Clock3 size={18} />研究打卡</h2><p>悬停查看时长，点击日期查看或维护当天打卡。</p></div><div className="report-panel-actions"><ReportPeriodPicker label="研究打卡" selection={checkinPeriod.selection} onChange={checkinPeriod.setSelection} /><Button variant="primary" aria-expanded={checkinOpen} onClick={() => { setCheckin(null); setCheckinOpen(!checkinOpen) }}><Plus size={15} />登记打卡</Button></div></header>
-        <div className="report-checkin-totals"><div><span>所选期间累计</span><strong>{formatDuration(checkinData.checkinMinutes)}</strong></div><div><span>有打卡的日期</span><strong>{checkinData.checkinDays} <small>天</small></strong></div><div><span>工作日目标 · 每天 12 小时</span><strong>{checkinTarget.known ? formatDuration(checkinTarget.minutes) : '节假日资料待补充'}</strong></div></div>
+      <section className="report-panel" id="report-checkins"><header><div><h2><Clock3 size={18} />研究打卡</h2><p>悬停查看时长，点击日期查看或维护当天打卡。</p></div><div className="report-panel-actions"><ReportPeriodPicker label="研究打卡" selection={checkinPeriod.selection} onChange={checkinPeriod.setSelection} /><div className="report-checkin-actions"><Button aria-expanded={absenceKind === 'trip'} onClick={() => openAbsence('trip')}><Plus size={15} />登记出差</Button><Button aria-expanded={absenceKind === 'leave'} onClick={() => openAbsence('leave')}><Plus size={15} />登记休假</Button><Button variant="primary" aria-expanded={checkinOpen} onClick={() => { setCheckin(null); setAbsenceKind(null); setCheckinOpen(!checkinOpen) }}><Plus size={15} />登记打卡</Button></div></div></header>
+        <div className="report-checkin-totals"><div><span>所选期间累计</span><strong>{formatDuration(checkinData.checkinMinutes)}</strong></div><div><span>有打卡的日期</span><strong>{checkinData.checkinDays} <small>天</small></strong></div><div><span>本期目标 · 已扣除出差/休假</span><strong>{checkinTarget.known ? formatDuration(checkinTarget.minutes) : '节假日资料待补充'}</strong></div></div>
+        <p className="report-absence-summary">出差和休假每天从周、月目标中扣除 12 小时，周末和节假日同样扣除；这些日期的打卡不计入累计。{checkinData.deductionMinutes > 0 && <strong> 本期扣除：出差 {checkinData.tripDays} 天、休假 {checkinData.leaveDays} 天，共 {formatDuration(checkinData.deductionMinutes)}。</strong>}</p>
+        <AnimatePresence initial={false}>{absenceKind && <CheckinAbsenceForm key={absence?.id ?? absenceKind} entry={absence} kind={absenceKind} busy={busy} save={input => act(() => window.workbench.saveCheckinAbsence(input, absence?.id)).then(ok => { if (ok) { setAbsenceKind(null); setAbsence(null); setCheckinDay(input.startDate); checkinPeriod.setSelection({ period: 'month', month: input.startDate.slice(0, 7), week: 0 }) } })} cancel={() => setAbsenceKind(null)} />}</AnimatePresence>
         <AnimatePresence initial={false}>{checkinOpen && <CheckinForm key={checkin?.id ?? 'new'} entry={checkin} busy={busy} save={input => act(() => window.workbench.saveCheckin(input, checkin?.id)).then(ok => { if (ok) { setCheckinOpen(false); setCheckin(null) } })} cancel={() => setCheckinOpen(false)} />}</AnimatePresence>
-        <div className={`report-activity-layout report-checkin-layout${!checkinData.checkins.length ? ' is-empty-period' : ''}`}>
-          <ReportHeatmap days={checkinData.days} metric="checkinMinutes" label="研究打卡热力图" today={localDay(now)} selectedDate={selectedCheckin} onSelectDate={setCheckinDay} details={date => recordsForDay(date).map(entry => [entry.startTime && entry.endTime ? (entry.date !== date ? '前日 ' : '') + entry.startTime + ' — ' + (entry.endsNextDay && entry.date === date ? '次日 ' : '') + entry.endTime : '原有时长记录', entry.notes].filter(Boolean).join(' · '))} />
-          <aside className="report-side-detail" aria-label="研究打卡当天详情"><ReportDayDetails date={selectedCheckin} checkins={recordsForDay(selectedCheckin)} edit={entry => { setCheckin(entry); setCheckinOpen(true) }} remove={id => setDeleteItem({ kind: 'checkin', id })} /><p className="report-source-note">在日历上选择一天，即可查看时间段与备注。</p></aside>
+        <div className={`report-activity-layout report-checkin-layout${!checkinData.checkinDays ? ' is-empty-period' : ''}`}>
+          <ReportHeatmap days={checkinData.days} metric="checkinMinutes" label="研究打卡热力图" today={localDay(now)} selectedDate={selectedCheckin} onSelectDate={setCheckinDay} dayMark={date => { const item = checkinAbsenceForDate(snapshot.absences, date); return item ? { kind: item.kind, label: `${checkinAbsenceLabels[item.kind]} · 目标扣除 12 小时${item.notes ? ` · ${item.notes}` : ''}`, badge: item.kind === 'trip' ? '差' : '假' } : undefined }} details={date => recordsForDay(date).map(entry => [entry.startTime && entry.endTime ? (entry.date !== date ? '前日 ' : '') + entry.startTime + ' — ' + (entry.endsNextDay && entry.date === date ? '次日 ' : '') + entry.endTime : '原有时长记录', entry.notes].filter(Boolean).join(' · '))} />
+          <aside className="report-side-detail" aria-label="研究打卡当天详情"><ReportDayDetails date={selectedCheckin} checkins={recordsForDay(selectedCheckin)} absence={checkinAbsenceForDate(snapshot.absences, selectedCheckin)} edit={entry => { setCheckin(entry); setAbsenceKind(null); setCheckinOpen(true) }} remove={id => setDeleteItem({ kind: 'checkin', id })} /><p className="report-source-note">在日历上选择一天，即可查看时间段与备注。</p></aside>
         </div>
+        <div className="report-absence-records" aria-label="本期出差与休假记录"><h3>本期出差与休假 <span>{periodAbsences.length} 条记录</span></h3>{periodAbsences.length ? periodAbsences.map(item => <div className="report-absence-row" key={item.id}><div><strong>{checkinAbsenceLabels[item.kind]} <time dateTime={item.startDate}>{item.startDate}</time>{item.endDate !== item.startDate && <> — <time dateTime={item.endDate}>{item.endDate}</time></>}</strong>{item.notes && <span>{item.notes}</span>}</div><div className="report-row-actions"><Button variant="ghost" disabled={busy} aria-label={`编辑${checkinAbsenceLabels[item.kind]} ${item.startDate}`} onClick={() => openAbsence(item.kind, item)}><Pencil size={15} /></Button><Button variant="ghost" disabled={busy} aria-label={`移除${checkinAbsenceLabels[item.kind]} ${item.startDate}`} onClick={() => setDeleteItem({ kind: 'absence', id: item.id })}><Trash2 size={15} /></Button></div></div>) : <p className="report-empty">本期未登记出差或休假。</p>}</div>
       </section>
       <section className="report-panel" id="report-finance"><header><div><h2>津贴到账</h2><p>按到账月份汇总，悬停柱形查看金额与来源。</p></div><div className="report-finance-total"><span>{financeYear} 年合计<strong>¥ {money(finance.amountCents)}</strong></span><Button onClick={() => setStipendManagerOpen(true)}>管理记录</Button><Button variant="primary" aria-expanded={stipendOpen} onClick={() => { setStipend(null); setStipendOpen(!stipendOpen) }}><Plus size={15} />登记津贴</Button></div></header>
         <div className="report-finance-year"><Button variant="ghost" aria-label="上一年津贴" disabled={financeYear <= 1000} onClick={() => setFinanceYear(financeYear - 1)}><ChevronLeft size={17} /></Button><label>统计年份<select aria-label="津贴统计年份" value={financeYear} onChange={event => setFinanceYear(Number(event.target.value))}>{[...new Set([now.getFullYear(), financeYear, ...snapshot.stipends.map(item => Number(item.receivedOn.slice(0, 4)))])].sort((a, b) => b - a).map(year => <option key={year} value={year}>{year} 年</option>)}</select></label><Button variant="ghost" aria-label="下一年津贴" disabled={financeYear >= 9999} onClick={() => setFinanceYear(financeYear + 1)}><ChevronRight size={17} /></Button>{financeYear !== now.getFullYear() && <Button variant="ghost" onClick={() => setFinanceYear(now.getFullYear())}>回到今年</Button>}</div>
@@ -106,7 +113,7 @@ export function ReportsWorkspace() {
     {stipendManagerOpen && <Dialog open onOpenChange={setStipendManagerOpen} title="管理津贴记录" description={`${financeYear} 年 · ${finance.receipts.length} 条记录`} className="report-record-dialog">
       {!finance.receipts.length ? <p className="report-empty">这一年还没有津贴记录。</p> : <div className="report-record-list">{[...finance.receipts].sort((a, b) => b.receivedOn.localeCompare(a.receivedOn)).map(item => <div key={item.id}><div><strong>{item.source}</strong><span>{item.receivedOn} · ¥ {money(item.amountCents)}{item.notes ? ` · ${item.notes}` : ''}</span></div><Button variant="ghost" aria-label={`编辑津贴 ${item.source}`} onClick={() => { setStipend(item); setStipendOpen(true); setStipendManagerOpen(false); document.getElementById('report-finance')?.scrollIntoView({ block: 'start' }) }}><Pencil size={15} /></Button><Button variant="ghost" aria-label={`移除津贴 ${item.source}`} onClick={() => { setStipendManagerOpen(false); setDeleteItem({ kind: 'stipend', id: item.id }) }}><Trash2 size={15} /></Button></div>)}</div>}
     </Dialog>}
-    {deleteItem && <ConfirmDialog open title={deleteItem.kind === 'stipend' ? '移除这条津贴记录？' : '移除这条打卡记录？'} description="移除后会重新计算报表中的金额或时长。" busy={busy} onClose={() => setDeleteItem(null)} onConfirm={() => void act(() => deleteItem.kind === 'stipend' ? window.workbench.deleteStipend(deleteItem.id) : window.workbench.deleteCheckin(deleteItem.id)).then(ok => { if (ok) setDeleteItem(null) })} />}
+    {deleteItem && <ConfirmDialog open title={deleteItem.kind === 'stipend' ? '移除这条津贴记录？' : deleteItem.kind === 'absence' ? '移除这条出差或休假记录？' : '移除这条打卡记录？'} description="移除后会重新计算报表中的金额或时长。" busy={busy} onClose={() => setDeleteItem(null)} onConfirm={() => void act(() => deleteItem.kind === 'stipend' ? window.workbench.deleteStipend(deleteItem.id) : deleteItem.kind === 'absence' ? window.workbench.deleteCheckinAbsence(deleteItem.id) : window.workbench.deleteCheckin(deleteItem.id)).then(ok => { if (ok) setDeleteItem(null) })} />}
   </main>
 }
 function StipendForm({ entry, busy, save, cancel }: { entry: StipendEntry | null; busy: boolean; save: (input: import('../../../shared/reports').StipendInput) => Promise<void>; cancel: () => void }) {

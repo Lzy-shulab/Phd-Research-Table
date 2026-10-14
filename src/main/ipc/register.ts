@@ -41,7 +41,7 @@ import { UpdateService } from '../update/service'
 import { CountdownRepository } from '../database/repositories/countdowns'
 import { countdownInputSchema } from '../../domain/countdowns'
 import { ReportsRepository } from '../database/repositories/reports'
-import { readingDateInputSchema, reportSettingsSchema, stipendInputSchema, checkinInputSchema } from '../../domain/reports'
+import { readingDateInputSchema, reportSettingsSchema, stipendInputSchema, checkinInputSchema, checkinAbsenceInputSchema } from '../../domain/reports'
 
 export function registerIpc(
   getConnection: () => DatabaseConnection,
@@ -93,6 +93,8 @@ export function registerIpc(
   handle('reports:snapshot', () => reportsRepo().snapshot())
   handle('reports:checkin-save', (input, id) => reportsRepo().saveCheckin(checkinInputSchema.parse(input), idSchema.optional().parse(id)))
   handle('reports:checkin-delete', id => reportsRepo().deleteCheckin(idSchema.parse(id)))
+  handle('reports:absence-save', (input, id) => reportsRepo().saveCheckinAbsence(checkinAbsenceInputSchema.parse(input), idSchema.optional().parse(id)))
+  handle('reports:absence-delete', id => reportsRepo().deleteCheckinAbsence(idSchema.parse(id)))
   handle('reports:settings', input => reportsRepo().settings(reportSettingsSchema.parse(input)))
   handle('reports:stipend-save', (input, id) => reportsRepo().saveStipend(stipendInputSchema.parse(input), idSchema.optional().parse(id)))
   handle('reports:stipend-delete', id => reportsRepo().deleteStipend(idSchema.parse(id)))
@@ -180,6 +182,7 @@ export function registerIpc(
   }
   const updateSession = session.fromPartition('workbench-update-network', { cache: false })
   const updates = new UpdateService({
+    helperPath: app.isPackaged ? join(process.resourcesPath, 'apply-update.ps1') : join(app.getAppPath(), 'resources', 'apply-update.ps1'),
     currentVersion: app.getVersion(),
     installable: app.isPackaged && process.platform === 'win32',
     cacheDirectory: join(app.getPath('temp'), 'PhD-Research-Workbench', 'updates'),

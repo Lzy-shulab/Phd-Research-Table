@@ -33,10 +33,11 @@ function ChartHover({ label, lines, children, onSelect, selected }: { label: str
     {anchor && createPortal(<div ref={tooltip} id={id} role="tooltip" className="report-tooltip"><strong>{label}</strong>{lines.map((line, i) => <span key={i}>{line}</span>)}</div>, document.body)}
   </div>
 }
-export function ReportHeatmap({ days, metric, label, today = localDay(), selectedDate, onSelectDate, details }: {
+export function ReportHeatmap({ days, metric, label, today = localDay(), selectedDate, onSelectDate, details, dayMark }: {
   days: { date: string; papers: number; tasks: number; checkinMinutes: number }[]
   metric: 'papers' | 'tasks' | 'checkinMinutes'; label: string; today?: string
   selectedDate?: string; onSelectDate?: (date: string) => void; details?: (date: string) => string[]
+  dayMark?: (date: string) => { kind: string; label: string; badge: string } | undefined
 }) {
   const max = metric === 'checkinMinutes' ? 720 : Math.max(4, ...days.map(day => day[metric]))
   const offset = days.length > 7 ? (new Date(`${days[0]!.date}T12:00:00`).getDay() + 6) % 7 : 0
@@ -48,7 +49,7 @@ export function ReportHeatmap({ days, metric, label, today = localDay(), selecte
       {Array.from({ length: offset }, (_, i) => <span key={`blank-${i}`} />)}
       {days.map(day => {
         const value = day[metric], level = value ? Math.min(4, Math.max(1, Math.ceil(value / max * 4))) : 0
-        const future = day.date > today, mark = calendarDayMark(day.date)
+        const future = day.date > today, mark = dayMark?.(day.date) ?? calendarDayMark(day.date)
         const amount = metric === 'checkinMinutes' ? formatDuration(value) : `${value} ${metric === 'papers' ? '篇' : '项'}`
         const lines = metric === 'checkinMinutes' ? [`打卡：${amount}`]
           : [`读完论文：${day.papers} 篇`, `完成任务：${day.tasks} 项`]

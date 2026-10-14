@@ -1,3 +1,4 @@
+import { SettingsHeading } from './SettingsHeading'
 import { useState } from 'react'
 import { Check, ImagePlus, Monitor, Moon, Palette, PanelBottomClose, PanelLeftClose, Quote, RotateCcw, Rows3, Sun, Type } from 'lucide-react'
 import { motion } from 'motion/react'
@@ -18,7 +19,7 @@ export function AppearanceSettings() {
   const setAppearance = useWorkbench((state) => state.setAppearance)
   const [notice, setNotice] = useState('')
   return <section className="appearance-section" id="appearance-settings" aria-labelledby="appearance-heading">
-    <div className="storage-section-heading"><Palette size={19} /><div><h2 id="appearance-heading">外观与显示</h2><p>调整背景与文字，让工作台更适合你的阅读习惯。</p></div></div>
+    <SettingsHeading icon={Palette} title="外观与显示" id="appearance-heading"><p>调整背景与文字，让工作台更适合你的阅读习惯。</p></SettingsHeading>
     <div className="appearance-card">
       <div className="appearance-setting theme-setting"><div><h3>显示模式</h3><p>浅色、深色，或跟随系统。</p></div>
         <div className="appearance-segments" role="group" aria-label="显示模式">

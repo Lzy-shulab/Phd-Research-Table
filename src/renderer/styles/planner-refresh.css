@@ -88,7 +88,8 @@
 .mini-day.is-selected { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 .mini-day.outside { opacity: 0.75; }
 
-.quick-capture { position: relative; flex-wrap: wrap; gap: 9px; }
+/* Keep the options above later cards, including their animated stacking contexts. */
+.quick-capture { position: relative; z-index: 2; flex-wrap: wrap; gap: 9px; }
 .quick-capture > input[aria-label='添加一个研究任务'] { flex: 1 1 210px; min-width: 160px; }
 .capture-more { position: relative; flex: 0 0 auto; }
 .capture-more > summary {

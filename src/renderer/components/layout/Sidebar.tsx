@@ -12,6 +12,8 @@ import { MiniCalendar } from './MiniCalendar'
 import { LibrarySidebar } from '../literature/LibrarySidebar'
 import { OutputsSidebar } from '../outputs/OutputsSidebar'
 import { SubmissionsSidebar } from '../submissions/SubmissionsSidebar'
+import { WorkspaceGlyph } from '../ui/WorkspaceGlyph'
+import { settleSpring } from '../../lib/motion'
 
 export function Sidebar() {
   const section = useWorkbench((s) => s.section)
@@ -28,7 +30,7 @@ export function Sidebar() {
     <aside className="sidebar">
       <div className="sidebar-top">
         <span className="sidebar-module">
-          <module.icon size={17} />
+          <WorkspaceGlyph section={section} />
           {module.label}
         </span>
       </div>
@@ -56,7 +58,7 @@ export function Sidebar() {
                     onClick={() => navigate(item.id)}
                   >
                     {view === item.id && (
-                      <motion.span className="nav-selection" layoutId="planner-view-selection" />
+                      <motion.span className="nav-selection" layoutId="planner-view-selection" transition={settleSpring} aria-hidden="true" />
                     )}
                     <item.icon size={17} strokeWidth={1.7} />
                     <span>{item.label}</span>

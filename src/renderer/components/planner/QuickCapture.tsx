@@ -1,5 +1,5 @@
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react'
-import { CalendarClock, ChevronDown, FolderPlus, Sparkles, Plus } from 'lucide-react'
+import { CalendarClock, ChevronDown, Sparkles, Plus } from 'lucide-react'
 import { useAssistant, assistantConfigured } from '../../stores/assistant'
 import { useWorkbench } from '../../stores/workbench'
 import type { TaskCreate, TaskTemplate } from '../../../shared/types'
@@ -109,6 +109,7 @@ export function QuickCapture({
         <ProjectSelect
           value={projectId}
           onChange={setChosenProject}
+          onCreate={() => { setCreateAfterProject(false); setNewProject(true) }}
           allowAutomatic={recognitionEnabled}
         />
         {!recognitionEnabled && <div className="capture-date" title={`安排日期：${scheduledDate || context}`}><DateInput label="新任务安排日期" value={scheduledDate} onChange={setScheduledDate} /></div>}
@@ -118,7 +119,6 @@ export function QuickCapture({
             <p>直接添加只需标题和项目；以下设置按需使用。</p>
             {templates.length > 0 && <select className="capture-template" aria-label="使用任务模板" value={chosenTemplate?.id ?? ''} onChange={(event) => { const template = templates.find((item) => item.id === event.target.value) ?? null; setChosenTemplate(template); if (!template) return; setTitle(template.title); if (template.projectId) setChosenProject(template.projectId) }}><option value="">任务模板…</option>{templates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}</select>}
             {scheduledDate && <label className="capture-repeat" title="每周生成彼此独立的安排"><input type="checkbox" checked={repeat} onChange={(event) => { setRepeat(event.target.checked); if (event.target.checked && recognitionEnabled) void useAssistant.getState().setQuickRecognition(false) }} /><CalendarClock size={14} /><span>每周重复</span>{repeat && <input aria-label="重复次数" type="number" min={2} max={52} value={occurrences} onChange={(event) => setOccurrences(Math.max(2, Math.min(52, Number(event.target.value) || 2)))} />}</label>}
-            <button type="button" className="capture-new-project" onClick={() => { setCreateAfterProject(false); setNewProject(true) }}><FolderPlus size={14} />新建项目</button>
             <button type="button" role="switch" aria-checked={recognitionEnabled} className="capture-ai-toggle" title="开启后用 AI 识别日期、时间和项目，再添加任务" aria-label="AI 识别日期时间和项目" disabled={assistantBusy || recognitionSaving} onClick={() => void useAssistant.getState().setQuickRecognition(!recognitionEnabled)}><Sparkles size={15} /><span>AI 识别日期、时间和项目</span><span className="capture-ai-switch" aria-hidden="true"><i /></span></button>
           </div>
         </details>

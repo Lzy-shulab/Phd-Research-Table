@@ -1,4 +1,5 @@
-import { rangeDays, type DateRange } from './reports'
+import { checkinAbsenceForDate, rangeDays, type DateRange } from './reports'
+import { checkinAbsenceMinutes, type CheckinAbsenceEntry } from '../shared/reports'
 
 // Research targets and calendar labels share Mainland China's official schedule.
 export const holidayCalendars: Record<number, { source: string; holidays: [string, string][] }> = {
@@ -36,9 +37,11 @@ export function calendarDayMark(date: string): { kind: 'holiday' | 'rest' | 'wor
   const weekday = new Date(`${date}T12:00:00`).getDay()
   return weekday === 0 || weekday === 6 ? { kind: 'rest', label: '周末休息日', badge: '休' } : { kind: 'work', label: '工作日', badge: '' }
 }
-export function workdayTarget(range: DateRange) {
-  const days = rangeDays(range).map(researchWorkday)
+export function workdayTarget(range: DateRange, absences: CheckinAbsenceEntry[] = []) {
+  const dates = rangeDays(range)
+  const days = dates.map(researchWorkday)
   const known = days.every(day => day !== null)
   const count = known ? days.filter(Boolean).length : 0
-  return { known, days: count, minutes: count * 12 * 60 }
+  const deductionMinutes = dates.filter(date => checkinAbsenceForDate(absences, date)).length * checkinAbsenceMinutes
+  return { known, days: count, deductionMinutes, minutes: known ? Math.max(0, count * 12 * 60 - deductionMinutes) : 0 }
 }

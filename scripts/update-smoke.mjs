@@ -22,12 +22,11 @@ try {
       globalThis.fetch = async (input) => {
         const url = String(input)
         if (url === 'https://api.github.com/repos/Lzy-shulab/Phd-Research-Table/releases/latest') return new Response(JSON.stringify({
-          tag_name: 'v0.7.4', name: 'PhD 科研工作台 0.7.4',
-          html_url: 'https://github.com/Lzy-shulab/Phd-Research-Table/releases/tag/v0.7.4',
+          tag_name: 'v0.8.25', name: 'PhD 科研工作台 0.8.25',
+          html_url: 'https://github.com/Lzy-shulab/Phd-Research-Table/releases/tag/v0.8.25',
           published_at: '2026-09-10T00:00:00Z', draft: false, prerelease: false,
-          assets: [{ name: 'PhD-Research-Workbench-0.7.4-Setup.exe', size: 10,
-            browser_download_url: 'https://github.com/Lzy-shulab/Phd-Research-Table/releases/download/v0.7.4/PhD-Research-Workbench-0.7.4-Setup.exe',
-            digest: `sha256:${'a'.repeat(64)}` }]
+          assets: [{ name: 'PhD-Research-Workbench-0.8.25-Setup.exe', size: 10,
+            browser_download_url: 'https://github.com/Lzy-shulab/Phd-Research-Table/releases/download/v0.8.25/PhD-Research-Workbench-0.8.25-Setup.exe' }]
         }), { status: 200 })
         return new Response('', { status: 404 })
       }
@@ -37,9 +36,9 @@ try {
   assert.equal(await page.getByText(/仅在你点击后连接固定的 GitHub 仓库/).count(), 0)
   assert.equal(await page.getByText(/更新包不会操作工作台数据库/).count(), 0)
   await page.getByRole('button', { name: '检查并下载更新', exact: true }).click()
-  if (live) await page.getByText(/当前版本 0\.7\.4 高于 GitHub 正式版|当前已是最新版 0\.7\.4/).waitFor()
-  else await page.getByText('当前已是最新版 0.7.4。', { exact: true }).waitFor()
-  assert.equal(await page.getByRole('button', { name: '安装更新', exact: true }).count(), 0)
+  if (live) await page.getByText(/当前版本 0\.8\.25 高于 GitHub 正式版|当前已是最新版 0\.8\.25/).waitFor()
+  else await page.getByText('当前已是最新版 0.8.25。', { exact: true }).waitFor()
+  assert.equal(await page.getByRole('button', { name: '重启并更新', exact: true }).count(), 0)
   await page.screenshot({ path: join(directory, 'settings-update.png'), animations: 'disabled', scale: 'css' })
   assert.deepEqual(errors, [])
   writeFileSync(join(directory, 'report.json'), JSON.stringify({ checks: ['concise settings update control', 'fixed GitHub latest request', 'up-to-date branch'], errors, dataDirectory, executablePath: executablePath ?? 'development', boundary: live ? 'Live GitHub Latest Release metadata check; no installer was downloaded or launched because the local version was current or newer.' : 'GitHub response stubbed in the Electron main process; no installer was downloaded or launched.' }, null, 2))

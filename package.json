@@ -1,7 +1,7 @@
 {
   "name": "phd-research-workbench",
   "productName": "PhD 科研工作台",
-  "version": "0.8.20",
+  "version": "0.8.25",
   "description": "A local-first desktop workspace for deliberate research planning.",
   "author": "PhD 科研工作台",
   "private": true,
@@ -95,6 +95,7 @@
       "node_modules/better-sqlite3/**/*"
     ],
     "extraResources": [
+      { "from": "resources/apply-update.ps1", "to": "apply-update.ps1" },
       {
         "from": "resources/translation-progress.py",
         "to": "translation-progress.py"

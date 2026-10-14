@@ -1,3 +1,4 @@
+import { SettingsHeading } from './SettingsHeading'
 import { useEffect, useState } from 'react'
 import { Bot, Check, CheckCircle2, CircleAlert, FileText, Languages, PlugZap, Sparkles } from 'lucide-react'
 import { assistantProviderLabels, assistantProviders, type AssistantProvider, type AssistantSettingsInput } from '../../../shared/assistant'
@@ -38,7 +39,7 @@ export function AssistantSettings() {
     finally { setBusy(false) }
   }
   return <section id="assistant-settings" className="assistant-settings" aria-labelledby="assistant-settings-heading">
-    <div className="storage-section-heading"><Bot size={20} /><div><h2 id="assistant-settings-heading">AI 助手</h2><p>说出计划，自动识别日期、时间和项目。</p></div></div>
+    <SettingsHeading icon={Bot} title="AI 助手" id="assistant-settings-heading"><p>说出计划，自动识别日期、时间和项目。</p></SettingsHeading>
     <div className="capability-readiness" aria-label="AI 与翻译能力状态">
       <article className={assistantConfigured(settings) ? 'is-ready' : ''}><Sparkles size={18} /><span><strong>计划助手</strong><small>{assistantConfigured(settings) ? `${assistantProviderLabels[settings!.activeProvider]} · 模型与密钥已配置` : '缺少可用模型或 API 密钥；直接录入仍可使用'}</small></span>{assistantConfigured(settings) ? <CheckCircle2 size={17} /> : <CircleAlert size={17} />}</article>
       <article className={assistantConfigured(settings) ? 'is-ready' : ''}><FileText size={18} /><span><strong>摘要翻译</strong><small>{assistantConfigured(settings) ? '复用计划助手服务；仅发送标题和摘要' : '需要先配置计划助手服务'}</small></span>{assistantConfigured(settings) ? <CheckCircle2 size={17} /> : <CircleAlert size={17} />}</article>

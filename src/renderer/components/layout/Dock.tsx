@@ -6,6 +6,7 @@ import { cn } from '../../lib/utils'
 import { useReducedMotion } from 'motion/react'
 import { gsap } from 'gsap'
 import { useGSAP } from '@gsap/react'
+import { WorkspaceGlyph } from '../ui/WorkspaceGlyph'
 
 gsap.registerPlugin(useGSAP)
 
@@ -41,8 +42,8 @@ export function Dock() {
     gsap.set(indicator.current, { width: selected.offsetWidth, height: selected.offsetHeight })
     gsap.to(indicator.current, {
       x: selected.offsetLeft, y: selected.offsetTop, opacity: 1,
-      duration: !placed.current || reducedMotion ? 0 : 0.32,
-      ease: 'power3.out', overwrite: true
+      duration: !placed.current || reducedMotion ? 0 : 0.38,
+      ease: 'power4.out', overwrite: true
     })
     placed.current = true
   }, { scope: container, dependencies: [section, reducedMotion] })
@@ -81,7 +82,7 @@ export function Dock() {
             aria-current={section === item.id ? 'page' : undefined}
             onClick={() => setSection(item.id)}
           >
-            <item.icon size={19} strokeWidth={1.65} />
+            <WorkspaceGlyph section={item.id} />
             <span>{item.label}</span>
           </button>
         ))}
