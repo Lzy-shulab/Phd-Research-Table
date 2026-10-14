@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import time
 import urllib.parse
 
 workspace = Path(__file__).resolve().parent.parent
@@ -21,6 +22,15 @@ if not token:
 proxy_url = os.environ.get('WORKBENCH_PUBLISH_PROXY', '')
 headers = {'Authorization': f'Bearer {token}', 'Accept': 'application/vnd.github+json', 'User-Agent': 'PhD-Workbench-Publisher', 'X-GitHub-Api-Version': '2022-11-28'}
 
+def run_curl(args):
+    config = '\n'.join(f'header = "{key}: {value}"' for key, value in headers.items())
+    for attempt in range(5):
+        response = subprocess.run(args, input=config, capture_output=True, encoding='utf-8')
+        # These failures happen before an HTTP request can reach GitHub.
+        if response.returncode not in {6, 7, 35} or attempt == 4:
+            return response
+        time.sleep(1)
+
 def api(path, method='GET', body=None):
     url = f'https://api.github.com/repos/{repository}/{path}'.rstrip('/')
     args = ['curl.exe', '--config', '-', '--silent', '--show-error', '--fail', '--http1.1', '--tlsv1.2', '--tls-max', '1.2', '--max-time', '60', '--request', method]
@@ -33,8 +43,7 @@ def api(path, method='GET', body=None):
     args += ['--header', 'Content-Type: application/json', url]
     if body is not None:
         args += ['--data-binary', json.dumps(body, ensure_ascii=False)]
-    config = '\n'.join(f'header = "{key}: {value}"' for key, value in headers.items())
-    response = subprocess.run(args, input=config, capture_output=True, encoding='utf-8')
+    response = run_curl(args)
     if response.returncode:
         raise RuntimeError(f'GitHub API request failed: {response.stderr.strip()}')
     return json.loads(response.stdout)
@@ -100,8 +109,7 @@ def publish():
         args = ['curl.exe', '--config', '-', '--silent', '--show-error', '--fail', '--http1.1', '--tlsv1.2', '--tls-max', '1.2', '--max-time', '600',
                 '--request', 'POST', '--upload-file', str(path), '--header', 'Content-Type: application/octet-stream', f'https://uploads.github.com{upload_path}']
         args += ['--proxy', proxy_url] if proxy_url else ['--noproxy', '*']
-        config = '\n'.join(f'header = "{key}: {value}"' for key, value in headers.items())
-        response = subprocess.run(args, input=config, capture_output=True, encoding='utf-8')
+        response = run_curl(args)
         if response.returncode:
             raise RuntimeError(f'GitHub upload failed: {response.stderr.strip()}')
         asset = json.loads(response.stdout)
