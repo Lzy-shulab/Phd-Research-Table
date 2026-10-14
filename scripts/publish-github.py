@@ -99,9 +99,9 @@ def publish():
     release = next((item for item in api('releases?per_page=30') if item['tag_name'] == f'v{version}'), None)
     if release is None:
         release = api('releases', 'POST', {'tag_name': f'v{version}', 'target_commitish': 'main', 'name': f'PhD 科研工作台 v{version}', 'body': notes, 'draft': True, 'prerelease': False})
-    paths = [workspace / 'release' / f'PhD-Research-Workbench-{version}-Setup.exe',
-             workspace / 'test-results' / f'fixes-{version}' / 'update-assets' / f'PhD-Research-Workbench-{version}-Update.zip',
-             workspace / 'test-results' / f'fixes-{version}' / 'update-assets' / 'latest-update.json']
+    paths = [workspace / 'test-results' / f'fixes-{version}' / 'update-assets' / 'latest-update.json',
+             workspace / 'release' / f'PhD-Research-Workbench-{version}-Setup.exe',
+             workspace / 'test-results' / f'fixes-{version}' / 'update-assets' / f'PhD-Research-Workbench-{version}-Update.zip']
     for path in paths:
         existing = next((item for item in release['assets'] if item['name'] == path.name), None)
         if existing:
@@ -111,7 +111,7 @@ def publish():
             raise RuntimeError(f'Incomplete existing asset: {path.name}')
         upload_path = f'/repos/{repository}/releases/{release["id"]}/assets?name={urllib.parse.quote(path.name)}'
         args = ['curl.exe', '--config', '-', '--silent', '--show-error', '--fail', '--http1.1', '--tlsv1.2', '--tls-max', '1.2', '--max-time', '600',
-                '--request', 'POST', '--upload-file', str(path), '--header', 'Content-Type: application/octet-stream', f'https://uploads.github.com{upload_path}']
+                '--request', 'POST', '--data-binary', f'@{path}', '--header', 'Expect:', '--header', 'Content-Type: application/octet-stream', f'https://uploads.github.com{upload_path}']
         args += ['--proxy', proxy_url] if proxy_url and os.environ.get('WORKBENCH_UPLOAD_DIRECT') != '1' else ['--noproxy', '*']
         response = run_curl(args)
         if response.returncode:
