@@ -50,7 +50,7 @@ def api(path, method='GET', body=None):
     response = run_curl(args)
     if response.returncode:
         raise RuntimeError(f'GitHub API request failed: {response.stderr.strip()}')
-    return json.loads(response.stdout)
+    return json.loads(response.stdout) if response.stdout.strip() else None
 
 def inspect():
     repo = api('')
