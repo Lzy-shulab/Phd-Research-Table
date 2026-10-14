@@ -47,7 +47,7 @@ jobs:
       - name: Rebuild SQLite for Electron
         run: npx electron-rebuild -f -w better-sqlite3
       - name: Package Windows
-        run: npx electron-builder --win nsis --config.nsis.differentialPackage=false
+        run: npx electron-builder --win nsis --publish never --config.nsis.differentialPackage=false
       - name: Verify packaged application
         env:
           WORKBENCH_DISABLE_ARXIV_AUTO: '1'
