@@ -1,0 +1,70 @@
+name: Publish Windows release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version already recorded in package.json
+        required: true
+        default: '0.8.25'
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REQUESTED_VERSION: ${{ inputs.version }}
+      WORKBENCH_DISABLE_ARXIV_AUTO: '1'
+      WORKBENCH_DISABLE_METADATA_AUTO: '1'
+      WORKBENCH_DISABLE_ENCOURAGEMENT_AUTO: '1'
+      WORKBENCH_DISABLE_NOTIFICATIONS: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Confirm release version
+        shell: pwsh
+        run: |
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          if ($version -ne $env:REQUESTED_VERSION) { throw 'Requested version differs from the source version.' }
+          "RELEASE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Install dependencies
+        run: npm ci
+      - name: Verify source
+        run: |
+          npm test
+          npm run lint
+      - name: Build application
+        run: npm run build
+      - name: Rebuild SQLite for Electron
+        run: npx electron-rebuild -f -w better-sqlite3
+      - name: Package Windows
+        run: npx electron-builder --win nsis --config.nsis.differentialPackage=false
+      - name: Verify packaged application
+        shell: pwsh
+        run: |
+          $env:WORKBENCH_TEST_EXECUTABLE = Join-Path (Get-Location) 'release/win-unpacked/PhD 科研工作台.exe'
+          node scripts/settings-alignment-smoke.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'Packaged settings check failed.' }
+          node scripts/checkin-absence-smoke.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'Packaged attendance check failed.' }
+      - name: Generate update archive
+        shell: pwsh
+        run: ./scripts/prepare-update-package.ps1 -OutputDirectory test-results/update-assets
+      - name: Upload release assets
+        shell: pwsh
+        run: |
+          $installer = "release/PhD-Research-Workbench-$env:RELEASE_VERSION-Setup.exe"
+          $archive = "test-results/update-assets/PhD-Research-Workbench-$env:RELEASE_VERSION-Update.zip"
+          gh release upload "v$env:RELEASE_VERSION" $installer $archive 'test-results/update-assets/latest-update.json' --clobber
+          if ($LASTEXITCODE -ne 0) { throw 'Release asset upload failed.' }
+      - name: Publish release
+        shell: pwsh
+        run: |
+          gh release edit "v$env:RELEASE_VERSION" --draft=false --latest
+          if ($LASTEXITCODE -ne 0) { throw 'Release publication failed.' }

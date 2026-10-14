@@ -110,7 +110,7 @@ def publish():
                 continue
             raise RuntimeError(f'Incomplete existing asset: {path.name}')
         upload_path = f'/repos/{repository}/releases/{release["id"]}/assets?name={urllib.parse.quote(path.name)}'
-        args = ['curl.exe', '--config', '-', '--silent', '--show-error', '--fail', '--http1.1', '--tlsv1.2', '--tls-max', '1.2', '--max-time', '600',
+        args = [os.environ.get('WORKBENCH_UPLOAD_CURL', 'curl.exe'), '--config', '-', '--silent', '--show-error', '--fail', '--http1.1', '--tlsv1.2', '--tls-max', '1.2', '--max-time', '600',
                 '--request', 'POST', '--data-binary', f'@{path}', '--header', 'Expect:', '--header', 'Content-Type: application/octet-stream', f'https://uploads.github.com{upload_path}']
         args += ['--proxy', proxy_url] if proxy_url and os.environ.get('WORKBENCH_UPLOAD_DIRECT') != '1' else ['--noproxy', '*']
         response = run_curl(args)
