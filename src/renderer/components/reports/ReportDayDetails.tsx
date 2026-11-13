@@ -2,7 +2,7 @@ import { motion, useReducedMotion } from 'motion/react'
 import { ArrowUpRight, BookOpen, CheckCheck, Clock3, Pencil, Trash2 } from 'lucide-react'
 import type { Paper, Task } from '../../../shared/types'
 import { checkinAbsenceLabels, checkinAbsenceMinutes, type CheckinAbsenceEntry, type CheckinEntry } from '../../../shared/reports'
-import { checkinDayParts, formatDuration } from '../../../domain/reports'
+import { checkinDayParts, formatDuration, isOpenCheckin } from '../../../domain/reports'
 import { calendarDayMark } from '../../../domain/work-calendar'
 import { useWorkbench } from '../../stores/workbench'
 import { useLibrary } from '../../stores/library'
@@ -28,7 +28,7 @@ export function ReportDayDetails({ date, papers = [], tasks = [], checkins, edit
       {tasks.map(task => <button className="report-source-row" key={task.id} onClick={() => { const store = useWorkbench.getState(); store.setSection('planner'); store.navigate('all'); store.selectTask(task.id) }}><CheckCheck size={16} /><span><strong>{task.title}</strong><small>研究计划 · 已完成</small></span><ArrowUpRight size={14} /></button>)}
       {checkins?.map(entry => {
         const part = checkinDayParts(entry).find(item => item.date === date)
-        return <div className="report-checkin-row" key={entry.id}><Clock3 size={16} /><div><strong>{entry.startTime && entry.endTime ? `${entry.date !== date ? '前日 ' : ''}${entry.startTime} — ${entry.endsNextDay && entry.date === date ? '次日 ' : ''}${entry.endTime}` : '原有时长记录'}</strong><span>{formatDuration(part?.minutes ?? 0)}{absence ? ' · 原记录保留，不计入累计' : entry.endsNextDay ? ' · 当天计入' : ''}</span>{entry.notes && <p>{entry.notes}</p>}</div><div className="report-row-actions"><Button variant="ghost" aria-label={`编辑打卡 ${entry.date}`} onClick={() => edit?.(entry)}><Pencil size={14} /></Button><Button variant="ghost" aria-label={`移除打卡 ${entry.date}`} onClick={() => remove?.(entry.id)}><Trash2 size={14} /></Button></div></div>
+        return <div className="report-checkin-row" key={entry.id}><Clock3 size={16} /><div><strong>{entry.startTime && entry.endTime ? `${entry.date !== date ? '前日 ' : ''}${entry.startTime} — ${entry.endsNextDay && entry.date === date ? '次日 ' : ''}${entry.endTime}` : isOpenCheckin(entry) ? `${entry.startTime} 开始` : '原有时长记录'}</strong><span>{isOpenCheckin(entry) ? '打卡中' : formatDuration(part?.minutes ?? 0)}{absence ? ' · 原记录保留，不计入累计' : entry.endsNextDay ? ' · 当天计入' : ''}</span>{entry.notes && <p>{entry.notes}</p>}</div><div className="report-row-actions"><Button variant="ghost" aria-label={`编辑打卡 ${entry.date}`} onClick={() => edit?.(entry)}><Pencil size={14} /></Button><Button variant="ghost" aria-label={`移除打卡 ${entry.date}`} onClick={() => remove?.(entry.id)}><Trash2 size={14} /></Button></div></div>
       })}
       {!(checkins ? checkins.length : papers.length + tasks.length) && <p className="report-day-empty">{checkins ? absence ? '该日期已从周、月目标扣除 12 小时，无需补录打卡。' : '这一天还没有打卡。' : '这一天还没有阅读或任务完成记录。'}</p>}
     </div>

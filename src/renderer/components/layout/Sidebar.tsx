@@ -1,5 +1,6 @@
 import { motion } from 'motion/react'
-import { Bot, Database, FolderCog, Monitor, Moon, Palette, Sun, ChartColumn, CircleGauge, Clock3, Wallet } from 'lucide-react'
+import { Bot, Database, FolderCog, Monitor, Moon, Palette, Sun, ChartColumn, CircleGauge, Clock3, Wallet, MessageSquare } from 'lucide-react'
+import { useShallow } from 'zustand/react/shallow'
 import { appearanceLabels } from '../../../shared/labels'
 import { modules, plannerViews } from '../../app/modules'
 import { useWorkbench } from '../../stores/workbench'
@@ -14,6 +15,23 @@ import { OutputsSidebar } from '../outputs/OutputsSidebar'
 import { SubmissionsSidebar } from '../submissions/SubmissionsSidebar'
 import { WorkspaceGlyph } from '../ui/WorkspaceGlyph'
 import { settleSpring } from '../../lib/motion'
+import { useWorkbenchCodex } from '../../stores/workbench-codex'
+import { useInterface } from '../../stores/interface'
+import { CodexNewChat } from '../codex/CodexNewChat'
+
+function AssistantSidebar() {
+  const prompts = useWorkbenchCodex(useShallow(state => state.turns.map(turn => turn.prompt)))
+  return <nav className="assistant-sidebar" aria-label="研究助手对话">
+    <CodexNewChat />
+    {prompts.length > 0 && <div className="assistant-sidebar-turns">
+      <p className="sidebar-section-label">本次对话</p>
+      {prompts.map((prompt, index) => <button key={index} className="sidebar-link" title={prompt} onClick={() => {
+        const id = useWorkbenchCodex.getState().turns[index]?.id
+        document.getElementById(`assistant-turn-${id}`)?.scrollIntoView({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' })
+      }}><MessageSquare size={15} /><span>{prompt}</span></button>)}
+    </div>}
+  </nav>
+}
 
 export function Sidebar() {
   const section = useWorkbench((s) => s.section)
@@ -22,19 +40,21 @@ export function Sidebar() {
   const appearance = useWorkbench((s) => s.appearance)
   const setAppearance = useWorkbench((s) => s.setAppearance)
   const databasePath = useWorkbench((s) => s.databasePath)
+  const collapsed = useInterface(state => state.preferences.sidebarCollapsed)
   const tasks = useTasks()
   const now = useClock()
   const active = tasks.filter((t) => t.status !== 'completed')
   const module = modules.find((m) => m.id === section)!
   return (
-    <aside className="sidebar">
-      <div className="sidebar-top">
+    <aside className="sidebar" inert={collapsed}>
+      {section !== 'codex' && <div className="sidebar-top">
         <span className="sidebar-module">
           <WorkspaceGlyph section={section} />
           {module.label}
         </span>
-      </div>
+      </div>}
       <div className="sidebar-scroll">
+        <div className="sidebar-view" key={section}>
         {section === 'planner' ? (
           <>
             <nav className="planner-nav" aria-label="研究计划视图">
@@ -76,7 +96,9 @@ export function Sidebar() {
         ) : section === 'submissions' ? (
           <SubmissionsSidebar />
         ) : section === 'reports' ? (
-          <><nav aria-label="研究报表分类">{[{ id: 'report-goals', label: '周期目标', icon: CircleGauge }, { id: 'report-trends', label: '研究趋势', icon: ChartColumn }, { id: 'report-checkins', label: '研究打卡', icon: Clock3 }, { id: 'report-finance', label: '津贴到账', icon: Wallet }].map(item => <button className="sidebar-link" key={item.id} onClick={() => document.getElementById(item.id)?.scrollIntoView({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' })}><item.icon size={17} /><span>{item.label}</span></button>)}</nav><p className="sidebar-note">阅读、任务与打卡按周期回顾；津贴按年汇总。</p></>
+          <><nav aria-label="研究报表分类">{[{ id: 'report-goals', label: '周期目标', icon: CircleGauge }, { id: 'report-trends', label: '研究趋势', icon: ChartColumn }, { id: 'report-checkins', label: '研究打卡', icon: Clock3 }, { id: 'report-finance', label: '津贴到账', icon: Wallet }].map(item => <button className="sidebar-link" key={item.id} onClick={() => document.getElementById(item.id)?.scrollIntoView({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' })}><item.icon size={17} /><span>{item.label}</span></button>)}</nav></>
+        ) : section === 'codex' ? (
+          <AssistantSidebar />
         ) : (
           <>
             <nav aria-label="设置分类">
@@ -108,9 +130,10 @@ export function Sidebar() {
                 <span>文件保存</span>
               </button>
             </nav>
-            <p className="sidebar-note">外观、AI 助手与文件位置，按你的习惯设置。</p>
+            
           </>
         )}
+        </div>
       </div>
       <div className="sidebar-footer">
         <div className="local-status" title={databasePath}>

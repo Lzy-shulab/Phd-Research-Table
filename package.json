@@ -1,7 +1,7 @@
 {
   "name": "phd-research-workbench",
   "productName": "PhD 科研工作台",
-  "version": "0.8.25",
+  "version": "0.8.61",
   "description": "A local-first desktop workspace for deliberate research planning.",
   "author": "PhD 科研工作台",
   "private": true,
@@ -39,7 +39,9 @@
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
+    "@fontsource-variable/manrope": "^5.3.0",
     "@gsap/react": "^2.1.2",
+    "@phosphor-icons/react": "^2.1.10",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-select": "^2.3.7",
     "better-sqlite3": "^13.0.3",
@@ -53,6 +55,8 @@
     "pdfjs-dist": "^6.3.289",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
     "tailwind-merge": "^3.5.0",
     "zod": "^4.3.6",
     "zustand": "^5.0.11"
@@ -89,13 +93,31 @@
     "electronDist": "node_modules/electron/dist",
     "files": [
       "out/**/*",
-      "package.json"
+      "package.json",
+      "!node_modules/**/*",
+      {
+        "from": "node_modules/better-sqlite3",
+        "to": "node_modules/better-sqlite3",
+        "filter": [
+          "lib/**/*",
+          "package.json",
+          "LICENSE",
+          "prebuilds/win32-x64.node"
+        ]
+      }
     ],
     "asarUnpack": [
       "node_modules/better-sqlite3/**/*"
     ],
     "extraResources": [
-      { "from": "resources/apply-update.ps1", "to": "apply-update.ps1" },
+      {
+        "from": "resources/task-capture.schema.json",
+        "to": "task-capture.schema.json"
+      },
+      {
+        "from": "resources/apply-update.ps1",
+        "to": "apply-update.ps1"
+      },
       {
         "from": "resources/translation-progress.py",
         "to": "translation-progress.py"
@@ -114,11 +136,16 @@
       }
     ],
     "win": {
+      "electronLanguages": [
+        "zh-CN",
+        "en-US"
+      ],
       "icon": "resources/icon.ico",
       "target": "nsis",
       "artifactName": "PhD-Research-Workbench-${version}-Setup.${ext}"
     },
     "nsis": {
+      "differentialPackage": false,
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true

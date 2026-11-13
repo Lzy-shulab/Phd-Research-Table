@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
-import { BookOpen, BookOpenText, Check, FileText, FolderOpen, Languages, MoreHorizontal, Plus, RefreshCw, Search, Settings2, Upload, Download, LayoutGrid, List } from 'lucide-react'
+import { BookOpen, BookOpenText, FileText, FolderOpen, Languages, MoreHorizontal, Plus, RefreshCw, Search, Settings2, Upload, Download, LayoutGrid, List } from 'lucide-react'
 import type { Paper } from '../../../shared/types'
 import { libraryAction, useLibrary } from '../../stores/library'
 import { useWorkbench } from '../../stores/workbench'
@@ -16,11 +16,14 @@ import { TranslationQueue } from './TranslationQueue'
 import { PaperOverviewDialog } from './PaperOverviewDialog'
 import { useInterface } from '../../stores/interface'
 import { ARXIV_LIBRARY_FOLDER } from '../../../shared/arxiv'
+import { JournalRanks } from './JournalRanks'
+import { PAPER_DAILY_FOLDER } from '../../../shared/paper-daily'
+import { PaperDailyPanel } from './PaperDailyPanel'
 import './arxiv-discovery.css'
 
 function PaperCard({ paper, folder, onEdit, onOverview, onTranslate }: { paper: Paper; folder?: string; onEdit: () => void; onOverview: () => void; onTranslate: () => void }) {
   const identifying = useMetadataJobs((state) => !!state.ids[paper.id])
-  const live = useLibrary((state) => state.translationProgress?.paperId === paper.id ? state.translationProgress : null)
+  const live = useLibrary((state) => state.activeTranslationProgress.find(progress => progress.paperId === paper.id))
   const reduced = useReducedMotion()
   const read = paper.maxReadPage
   const progress = paper.readingStatus === 'done' ? 100 : Math.min(99, paper.readProgress)
@@ -32,15 +35,16 @@ function PaperCard({ paper, folder, onEdit, onOverview, onTranslate }: { paper: 
   return <motion.article className="paper-card" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.18 }} data-testid="paper-card">
     <div className="paper-cover-area">
       <button className="paper-cover-button" onClick={open} aria-label={`阅读 ${paper.title}`}><PdfCover paper={paper} /></button>
-      <span className="paper-page-badge"><BookOpen size={12} />{read ? `${read} / ${paper.pageCount || '…'}` : '未读'}</span>
+      {read > 0 && <span className="paper-page-badge"><BookOpen size={12} />{read} / {paper.pageCount || '…'}</span>}
       <button className="paper-more" aria-label={`编辑文献 ${paper.title}`} onClick={onEdit}><MoreHorizontal size={18} /></button>
     </div>
     <div className="paper-card-body">
       <button className="paper-title" onClick={open} title={paper.title}>{paper.title}</button>
       <p className="paper-authors" title={paper.authors}>{paper.authors || '作者信息待补充'}</p>
       <div className="paper-tags"><span title={paper.journal || folder || '未分类'}><FolderOpen size={11} />{paper.journal || folder || '未分类'}</span>{paper.year && <small>{paper.year}</small>}</div>
+      <JournalRanks journal={paper.journal} />
       {paper.collection === 'library' && <div className="paper-metadata-row" title={paper.metadataMessage}>
-        <span>{identifying ? <><span className="tiny-spinner" />正在识别资料…</> : paper.metadataStatus === 'ready' ? <><Check size={11} />{paper.metadataSource || '资料已读取'}</> : paper.metadataStatus === 'failed' ? '资料识别未完成' : paper.metadataStatus === 'partial' ? '部分信息待补充' : '资料待识别'}</span>
+        {(identifying || paper.metadataStatus !== 'ready') && <span>{identifying ? <><span className="tiny-spinner" />正在识别资料…</> : paper.metadataStatus === 'failed' ? '资料识别未完成' : paper.metadataStatus === 'partial' ? '部分信息待补充' : '资料待识别'}</span>}
         <button disabled={identifying} aria-label={`自动识别文献信息 ${paper.title}`} onClick={() => void requestMetadata(paper)}><RefreshCw size={11} />{paper.metadataCheckedAt ? '重新识别' : '识别信息'}</button>
       </div>}
       {paper.arxivId && <p className="arxiv-paper-id" title={paper.abstract}>arXiv:{paper.arxivId} · {paper.publishedDate}</p>}
@@ -61,10 +65,20 @@ function PaperCard({ paper, folder, onEdit, onOverview, onTranslate }: { paper: 
 
 export function LiteratureWorkspace() {
   const folderId = useLibrary((s) => s.folderId)
+  const desktopReader = useLibrary((s) => s.reader?.fromDesktop)
+  const returning = useLibrary((s) => s.returningToDesktop)
+  if (desktopReader) return <PdfReader />
+  if (returning) return null
+  if (folderId === PAPER_DAILY_FOLDER) return <PaperDailyPanel />
   return <LiteratureContent key={folderId} />
 }
 function LiteratureContent() {
   const library = useLibrary()
+  const journals = JSON.stringify([...new Set(library.papers.map(paper => paper.journal))].sort())
+  useEffect(() => {
+    if (library.journalRanks?.enabled && library.journalRanks.configured)
+      void libraryAction(window.workbench.refreshJournalRanks(JSON.parse(journals) as string[]))
+  }, [journals, library.journalRanks?.enabled, library.journalRanks?.configured])
   const isArxiv = library.folderId === 'arxiv'
   const isArxivLibrary = library.folderId === ARXIV_LIBRARY_FOLDER
   const [query, setQuery] = useState('')
@@ -134,9 +148,9 @@ function LiteratureContent() {
       if (paths.length) setImporting({ paths })
       else useWorkbench.getState().notify('请拖入本机上的 PDF 文献文件。')
     }}>
-    <header className="workspace-header library-header"><div><div className="workspace-breadcrumb">{isArxiv ? '文献检索' : '文献阅读'}<span>/</span>{isArxiv ? 'Arxiv Daily' : isArxivLibrary ? '我的文件夹 / Arvix' : folder?.name ?? (library.folderId === 'unfiled' ? '未分类' : '全部文献')}</div>
+    <header className="workspace-header library-header"><div>
       <div className="heading-line"><h1>{isArxiv ? 'Arxiv Daily' : isArxivLibrary ? 'Arvix' : folder?.name ?? (library.folderId === 'unfiled' ? '未分类' : '文献库')}</h1><span className="library-count">{isArxiv ? `${library.arxiv.candidates.length} 篇待筛选` : `${scoped.length} 篇`}</span></div>
-      <p>{isArxiv ? '先读中英标题与摘要，再收藏值得深入阅读的论文。' : isArxivLibrary ? '来自 Arxiv Daily 的收藏，点击文献即可开始阅读。' : '让每一次阅读，留下下一步研究的线索。'}</p></div>
+      </div>
       <div className="workspace-actions"><Button variant="ghost" className="icon-button" aria-label="文献翻译设置" onClick={() => setSettings(true)}><Settings2 size={18} /></Button>
         {isArxiv ? <Button variant="primary" aria-busy={retrieving || library.arxiv.running} disabled={retrieving || library.arxiv.running} onClick={() => void retrieve()}>{retrieving || library.arxiv.running ? <span className="tiny-spinner" /> : <Download size={16} />}{retrieving || library.arxiv.running ? '检索中…' : '立即检索'}</Button>
           : isArxivLibrary ? <Button onClick={() => library.selectFolder('arxiv')}><Search size={16} />检索新文献</Button> : <Button variant="primary" onClick={() => setImporting({})}><Plus size={17} />添加文献</Button>}</div>
@@ -154,16 +168,15 @@ function LiteratureContent() {
       {isArxiv && <ArxivDailyPanel retrieving={retrieving} />}
       {library.loadError ? <div className="empty-state"><p role="alert">{library.loadError}</p><Button onClick={() => void library.load()}><RefreshCw size={15} />重试</Button></div>
         : !library.loaded ? <div className="empty-state">正在读取文献库…</div>
-        : isArxiv ? null : filtered.length ? display === 'list' && !isArxiv ? <div className="paper-compact-list" aria-label="文献紧凑列表">{filtered.map((item) => <article key={item.id} className="paper-compact-row"><input aria-label={`选择 ${item.title}`} type="checkbox" checked={selected.has(item.id)} onChange={(event) => setSelected((current) => { const next = new Set(current); if (event.target.checked) next.add(item.id); else next.delete(item.id); return next })} /><button className="paper-compact-title" title={item.title} onClick={() => useLibrary.getState().openPaper(item.id)}><strong>{item.title}</strong><span>{item.authors || '作者待补充'}</span></button><span className="paper-list-year">{item.year || '—'}</span><span className="paper-list-journal" title={item.journal}>{item.journal || '—'}</span><span className={`reading-status status-${item.readingStatus}`}>{item.readingStatus === 'done' ? '已读完' : item.readingStatus === 'reading' ? '阅读中' : '未读'}</span><div className="paper-list-actions"><Button onClick={() => useLibrary.getState().openPaper(item.id)}><BookOpen size={14} />阅读</Button><Button className="button-translation" disabled={['queued', 'translating'].includes(item.translationStatus)} onClick={() => item.translatedPath ? useLibrary.getState().openPaper(item.id, 'translated') : void translate(item)}><Languages size={14} />{item.translatedPath ? '译文' : item.translationStatus === 'queued' ? '排队中' : item.translationStatus === 'translating' ? '翻译中' : ['failed', 'interrupted'].includes(item.translationStatus) ? '重试' : '翻译'}</Button><Button variant="ghost" onClick={() => setEditing(item.id)}>编辑</Button></div></article>)}</div>
+        : isArxiv ? null : filtered.length ? display === 'list' && !isArxiv ? <div className="paper-compact-list" aria-label="文献紧凑列表">{filtered.map((item) => <article key={item.id} className="paper-compact-row"><input aria-label={`选择 ${item.title}`} type="checkbox" checked={selected.has(item.id)} onChange={(event) => setSelected((current) => { const next = new Set(current); if (event.target.checked) next.add(item.id); else next.delete(item.id); return next })} /><button className="paper-compact-title" title={item.title} onClick={() => useLibrary.getState().openPaper(item.id)}><strong>{item.title}</strong><span>{item.authors || '作者待补充'}</span><span className="paper-title-ranks"><JournalRanks journal={item.journal} /></span></button><span className="paper-list-year">{item.year || '—'}</span><div className="paper-list-journal"><span title={item.journal}>{item.journal || '—'}</span><JournalRanks journal={item.journal} /></div><span className={`reading-status status-${item.readingStatus}`}>{item.readingStatus === 'done' ? '已读完' : item.readingStatus === 'reading' ? '阅读中' : '未读'}</span><div className="paper-list-actions"><Button onClick={() => useLibrary.getState().openPaper(item.id)}><BookOpen size={14} />阅读</Button><Button className="button-translation" disabled={['queued', 'translating'].includes(item.translationStatus)} onClick={() => item.translatedPath ? useLibrary.getState().openPaper(item.id, 'translated') : void translate(item)}><Languages size={14} />{item.translatedPath ? '译文' : item.translationStatus === 'queued' ? '排队中' : item.translationStatus === 'translating' ? '翻译中' : ['failed', 'interrupted'].includes(item.translationStatus) ? '重试' : '翻译'}</Button><Button variant="ghost" onClick={() => setEditing(item.id)}>编辑</Button></div></article>)}</div>
           : <div className="paper-grid">{filtered.map((item) => <PaperCard key={item.id} paper={item} folder={library.folders.find((f) => f.id === item.folderId)?.name} onEdit={() => setEditing(item.id)} onOverview={() => setOverviewId(item.id)} onTranslate={() => void translate(item)} />)}</div>
         : <div className="library-empty"><div className="empty-paper-stack"><FileText size={46} strokeWidth={1} /></div>
           <h2>{scoped.length ? '没有找到符合条件的文献' : isArxivLibrary ? '收藏的 arXiv 文献会收录在这里' : '从一篇值得读的文献开始'}</h2>
-          <p>{scoped.length ? '调整搜索或筛选，继续寻找研究线索。' : isArxivLibrary ? '前往 Arxiv Daily，阅读中英摘要后收藏。' : '拖入 PDF，或添加文献。按期刊整理，随时阅读中英对照。'}</p>
           {scoped.length ? <Button onClick={() => { setQuery(''); setFilter('all'); setDay('all') }}>清除筛选</Button> : isArxivLibrary ? <Button onClick={() => library.selectFolder('arxiv')}><Search size={16} />前往检索</Button> : <Button variant="primary" onClick={() => setImporting({})}><Plus size={16} />添加第一篇文献</Button>}
         </div>}
-      {filtered.length > 0 && <p className="library-footnote">{filtered.length} 篇文献 · {isArxivLibrary ? '原文已下载到本机 · 可按需生成全文译文' : '拖入 PDF 可继续添加'}{folder ? ' · 包含子文件夹' : ''}</p>}
+      
     </div>
-    {dragging && <div className="library-drop-overlay"><Upload size={40} /><h2>松开，添加到文献库</h2><p>接下来可选择文件夹和翻译方式</p></div>}
+    {dragging && <div className="library-drop-overlay"><Upload size={40} /><h2>松开，添加到文献库</h2></div>}
     {importing && <ImportDialog paths={importing.paths} onClose={() => setImporting(null)} />}
     {paper && <PaperDialog key={paper.id} paper={paper} onClose={() => setEditing(null)} />}
     {overviewPaper && <PaperOverviewDialog key={`${overviewPaper.id}:${overviewPaper.title}`} paper={overviewPaper} onClose={() => setOverviewId(null)} />}

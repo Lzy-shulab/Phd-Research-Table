@@ -149,7 +149,7 @@ function SubmissionCard({
           </ol>
         </div>
       ) : (
-        <div className="submission-empty-stage">暂无状态记录；添加后会从左侧依次形成时间线。</div>
+        <div className="submission-empty-stage">暂无状态记录</div>
       )}
       {submission.notes && (
         <p className="submission-notes" title={submission.notes}>
@@ -238,14 +238,11 @@ export function SubmissionsWorkspace() {
     <main className="submissions-workspace">
       <header className="workspace-header">
         <div>
-          <div className="workspace-breadcrumb">
-            论文投稿<span>/</span>
-            {state.scope ?? '全部记录'}
-          </div>
+          
           <div className="heading-line">
             <h1>论文投稿</h1>
           </div>
-          <p>记录每一次投稿，掌握接下来要做的事。</p>
+          
         </div>
         <Button variant="primary" onClick={() => setEditing('new')}>
           <Plus size={16} />
@@ -268,7 +265,7 @@ export function SubmissionsWorkspace() {
           ))}
         </div>
         <div className="submission-count-note">
-          状态名称和日期均由你填写；尚无状态的记录不计入累计投稿。
+          未填写状态的记录不计入累计投稿。
           {reminders.length > 0 && (
             <button
               onClick={() => {
@@ -331,13 +328,11 @@ export function SubmissionsWorkspace() {
             <h2>
               {state.submissions.length ? '没有匹配的投稿记录' : '从一篇正在投稿的论文开始。'}
             </h2>
-            <p>{state.submissions.length ? '清除搜索和阶段筛选，即可恢复完整列表。' : '期刊、审稿进展与返修期限，都可以记录在这里。'}</p>
+            
             {state.submissions.length ? <Button onClick={() => { setQuery(''); state.setScope(null) }}>清除搜索和筛选</Button> : <Button onClick={() => setEditing('new')}><Plus size={15} />新增投稿</Button>}
           </div>
         )}
-        <p className="submission-footnote">
-          时间线只表示已记录的流程节点，不代表录用概率。系统提醒在应用运行时发送，重开后补查；关闭期间不发送。
-        </p>
+        
         {state.notificationError && (
           <p className="field-error" role="status">
             {state.notificationError}

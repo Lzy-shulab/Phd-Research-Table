@@ -1,0 +1,20 @@
+.desktop-more-content { flex:1; min-height:0; overflow:auto; padding:16px 24px; }
+.desktop-more-columns { display:flex; justify-content:space-between; gap:16px; color:var(--muted); font:var(--caption-2); padding:0 0 12px; }
+.desktop-more-list { list-style:none; padding:0; margin:0; }
+.desktop-more-list > li { display:flex; align-items:center; gap:12px; min-height:72px; padding:8px 0; border-bottom:1px solid var(--line); }
+.desktop-more-list > li > svg { color:var(--blue); flex-shrink:0; }
+.desktop-more-title { flex:1; min-width:0; font:var(--title-3); }
+.desktop-more-reorder { display:flex; gap:4px; }
+.desktop-more-reorder button { width:40px; height:40px; display:grid; place-items:center; border-radius:var(--radius-small); }
+.desktop-more-reorder button:hover:not(:disabled) { color:var(--blue); background:var(--accent-wash); }
+.desktop-more-reorder button:disabled { opacity:.35; cursor:default; }
+.desktop-more-list input[role=switch] { appearance:none; width:40px; height:24px; flex-shrink:0; margin:0 0 0 4px; border:1px solid var(--edge); border-radius:var(--radius-card); background:var(--field); cursor:pointer; }
+.desktop-more-list input[role=switch]::before { content:''; display:block; width:16px; height:16px; margin:3px; border-radius:50%; background:var(--ink); transition:transform .3s cubic-bezier(.22,1,.36,1); }
+.desktop-more-list input[role=switch]:checked { background:var(--accent); border-color:var(--accent); }
+.desktop-more-list input[role=switch]:checked::before { transform:translateX(16px); background:var(--panel-base); }
+.desktop-more-open { display:flex; align-items:center; gap:16px; width:100%; min-height:56px; text-align:left; border-radius:var(--radius-control); padding:8px 12px; font:var(--title-2); }
+.desktop-more-open > svg:first-child { color:var(--blue); flex-shrink:0; }
+.desktop-more-open > span { flex:1; }
+.desktop-more-open > svg:last-child { color:var(--muted); }
+.desktop-more-open:hover { background:var(--field-hover); }
+@media(prefers-reduced-motion:reduce) { .desktop-more-list input[role=switch]::before { transition:none; } }

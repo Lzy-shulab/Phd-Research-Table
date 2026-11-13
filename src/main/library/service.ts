@@ -16,37 +16,53 @@ import { ArxivDailyService, type ArxivEntry } from './arxiv'
 import { StorageService } from './storage'
 import { TranslationProfileStore, type SecretProtector } from './translation-profiles'
 import { TranslationEngineInstaller } from './engine-installer'
+import { codexTranslationStatus } from './codex-translator'
+import { JournalRankService } from './journal-ranks'
+import { translationSteps } from '../../shared/translation-progress'
+import { TranslationRateTracker } from './translation-rate'
+import { PaperDailyService } from './paper-daily'
+import type { DailyPaper } from '../../shared/paper-daily'
+import { JournalAbbreviations } from './journal-abbreviations'
 
 const LEGACY_DEFAULT_DIRECTORY = 'D:\\Python\\zotero-pdf2zh\\server'
 const MAX_PDF_SIZE = 100 * 1024 * 1024
+const PARALLEL_TRANSLATIONS = 3
 const message = (error: unknown) => error instanceof Error ? error.message : '操作未完成。'
 
 export interface LibraryServiceRuntime {
   translationEngineRoot: string
   translationEngineFetcher: typeof fetch
+  onChanged?: () => void
+  onProgress?: (progress: TranslationProgress | null) => void
+  onActiveProgress?: (active: TranslationProgress[]) => void
 }
 
 export class LibraryService {
   readonly repo: LibraryRepository
   readonly arxiv: ArxivDailyService
+  readonly paperDaily: PaperDailyService
+  readonly journalAbbreviations: JournalAbbreviations
   readonly storage: StorageService
   readonly translationProfiles: TranslationProfileStore
+  readonly journalRanks: JournalRankService
   private readonly engineInstaller: TranslationEngineInstaller | null
   private running = false
   private stopping = false
-  private activeChild: ChildProcess | null = null
-  private activePaperId: string | null = null
+  private readonly activeTranslations = new Map<string, ChildProcess | null>()
   private translationPaused = false
+  private translationQueueError = ''
   private cancelledTranslations = new Set<string>()
-  private progress: TranslationProgress | null = null
-  private progressSentAt = 0
+  private readonly progress = new Map<string, TranslationProgress>()
+  private readonly rateTrackers = new Map<string, TranslationRateTracker>()
   private progressTimer: ReturnType<typeof setTimeout> | null = null
   private publicationSelections = new Set<string>()
-  constructor(connection: DatabaseConnection, private readonly window: () => BrowserWindow | null, secretProtector?: SecretProtector, runtime?: LibraryServiceRuntime) {
+  constructor(connection: DatabaseConnection, private readonly window: () => BrowserWindow | null, secretProtector?: SecretProtector, private readonly runtime?: LibraryServiceRuntime) {
     this.repo = new LibraryRepository(connection.db)
+    this.journalAbbreviations = new JournalAbbreviations(this.repo, () => this.changed())
     this.translationPaused = this.repo.setting('translation.paused', 'false') === 'true'
     this.storage = new StorageService(this.repo, connection.path, window)
     this.translationProfiles = new TranslationProfileStore(this.repo, secretProtector)
+    this.journalRanks = new JournalRankService(this.repo, runtime?.translationEngineFetcher ?? fetch, () => this.changed(), secretProtector)
     this.engineInstaller = runtime ? new TranslationEngineInstaller({
       rootDirectory: runtime.translationEngineRoot,
       fetcher: runtime.translationEngineFetcher,
@@ -54,6 +70,8 @@ export class LibraryService {
     }) : null
     this.arxiv = new ArxivDailyService(this.repo, (entry, bytes, day) => this.addArxiv(entry, bytes, day),
       () => this.changed(), () => this.storage.directory('arxiv'))
+    this.paperDaily = new PaperDailyService(this.repo, () => this.arxiv.searchSettings(),
+      (paper, bytes) => this.saveOwned(bytes, paper, localDay(), true), () => this.changed())
     for (const paper of this.repo.papers()) {
       if (paper.translationStatus === 'translating')
         this.repo.translation(paper.id, 'interrupted', '应用在翻译完成前关闭。原文已保存，可以重试。')
@@ -63,28 +81,38 @@ export class LibraryService {
   changed() {
     const window = this.window()
     if (window && !window.isDestroyed()) window.webContents.send('library:changed')
+    this.runtime?.onChanged?.()
   }
-  private publishProgress(value: TranslationProgress | null) {
-    const previous = this.progress
-    this.progress = value
-    const now = Date.now()
-    if (value && previous && value.stage === previous.stage && now - this.progressSentAt < 200) {
-      if (!this.progressTimer) this.progressTimer = setTimeout(() => {
-        this.progressTimer = null
-        this.publishProgress(this.progress)
-      }, 200 - (now - this.progressSentAt))
+  private publishProgress(paperId: string, value: TranslationProgress | null, immediate = false) {
+    if (value) this.progress.set(paperId, value)
+    else this.progress.delete(paperId)
+    if (!immediate) {
+      this.progressTimer ??= setTimeout(() => this.sendProgress(), 200)
       return
     }
-    if (this.progressTimer) { clearTimeout(this.progressTimer); this.progressTimer = null }
-    this.progressSentAt = now
+    this.sendProgress()
+  }
+  private sendProgress() {
+    clearTimeout(this.progressTimer ?? undefined)
+    this.progressTimer = null
+    const { progress, activeProgress } = this.translationState()
     const window = this.window()
-    if (window && !window.isDestroyed()) window.webContents.send('library:translation-progress', value)
+    if (window && !window.isDestroyed()) window.webContents.send('library:translation-progress', progress, activeProgress)
+    this.runtime?.onProgress?.(progress)
+    this.runtime?.onActiveProgress?.(activeProgress)
+  }
+  translationState() {
+    const activeProgress = [...this.progress.values()]
+    return { progress: activeProgress[0] ?? null, activeProgress, paused: this.translationPaused, queueError: this.translationQueueError }
   }
   private updateProgress(paperId: string, value: EngineProgress) {
-    if (this.stopping || this.progress?.paperId !== paperId) return
-    this.publishProgress({ ...this.progress, ...value,
-      percent: value.percent === null ? this.progress.percent : Math.max(this.progress.percent ?? 0, value.percent),
-      updatedAt: new Date().toISOString() })
+    const previous = this.progress.get(paperId)
+    if (this.stopping || !previous) return
+    this.publishProgress(paperId, { ...previous, ...value,
+      rateWindow: this.rateTrackers.get(paperId)?.observe(paperId, value, Date.now()),
+      step: translationSteps.findIndex(step => step.id === value.step) >= translationSteps.findIndex(step => step.id === previous.step) ? value.step : previous.step,
+      percent: value.percent === null ? previous.percent : Math.max(previous.percent ?? 0, value.percent),
+      updatedAt: new Date().toISOString() }, value.stage !== previous.stage)
   }
   directory() {
     const configured = this.repo.setting('translation.directory', '')
@@ -94,7 +122,7 @@ export class LibraryService {
     return process.env.WORKBENCH_DISABLE_LEGACY_TRANSLATION_ENGINE !== '1' && translatorExecutable(LEGACY_DEFAULT_DIRECTORY)
       ? LEGACY_DEFAULT_DIRECTORY : ''
   }
-  busy() { return this.running || this.arxiv.busy() || this.engineInstaller?.busy() === true }
+  busy() { return this.running || this.activeTranslations.size > 0 || this.arxiv.busy() || this.paperDaily.busy() || this.engineInstaller?.busy() === true }
   async chooseStorageDirectory(kind: PaperCollection) {
     const result = await this.storage.choose(kind, () => {
       if (kind === 'arxiv' && this.arxiv.busy())
@@ -106,7 +134,9 @@ export class LibraryService {
   snapshot(): LibrarySnapshot {
     const serverDirectory = this.directory()
     const installed = !!serverDirectory && !!translatorExecutable(serverDirectory) && !!translationConfigTemplate(serverDirectory)
-    return { translationProgress: this.progress, arxiv: this.arxiv.snapshot(), folders: this.repo.folders(), papers: this.repo.papers(), metadataOnline: this.repo.setting('metadata.online', 'true') === 'true', metadataAutomatic: process.env.WORKBENCH_DISABLE_METADATA_AUTO !== '1',
+    const translation = this.translationState()
+    const folders = this.repo.folders(), papers = this.repo.papers()
+    return { journalRanks: this.journalRanks.snapshot(), journalFolderLabels: this.journalAbbreviations.labels(folders, papers), translationProgress: translation.progress, activeTranslationProgress: translation.activeProgress, arxiv: this.arxiv.snapshot(), paperDaily: this.paperDaily.snapshot(), folders, papers, metadataOnline: this.repo.setting('metadata.online', 'true') === 'true', metadataAutomatic: process.env.WORKBENCH_DISABLE_METADATA_AUTO !== '1',
       autoTranslate: installed && this.repo.setting('translation.auto', 'true') === 'true', serverDirectory, translationPaused: this.translationPaused }
   }
   async health(): Promise<TranslationHealth> {
@@ -120,13 +150,18 @@ export class LibraryService {
       try { this.translationProfiles.runtimeActive() }
       catch (error) { configured = false; configurationMessage = message(error) }
     }
+    if (configured && activeProfile.provider === 'codex-cli') {
+      const status = await codexTranslationStatus()
+      configured = status.installed && status.loggedIn
+      if (!configured) configurationMessage = status.message
+    }
     const installation = this.engineInstaller?.snapshot() ?? { state: 'idle' as const, progress: null, downloadedBytes: 0, totalBytes: null, message: '当前运行方式不支持自动安装。' }
     const installing = ['downloading', 'verifying', 'extracting'].includes(installation.state)
-    return { installed, configured, running: !!this.activeChild, serverDirectory, activeProfile, installation,
+    return { installed, configured, running: this.activeTranslations.size > 0, serverDirectory, activeProfile, installation,
       message: installing ? installation.message
         : !installed ? '尚未安装 PDF2zh 引擎。可一键安装官方环境，或选择已有环境。'
         : !configured ? (configurationMessage || `“${activeProfile.name}”尚未补全 API 配置`)
-          : this.activeChild ? `正在使用“${activeProfile.name}”翻译文献` : `本地配置已就绪：${activeProfile.name}` }
+          : this.activeTranslations.size ? `正在使用“${activeProfile.name}”翻译文献` : `本地配置已就绪：${activeProfile.name}` }
   }
   profiles() { return this.translationProfiles.snapshot() }
   saveProfile(input: TranslationProfileInput) {
@@ -144,7 +179,7 @@ export class LibraryService {
   deleteProfile(id: string) { const result = this.translationProfiles.delete(id); this.changed(); return result }
   async installTranslationEngine() {
     if (!this.engineInstaller) throw new DomainError('UNAVAILABLE', '当前运行方式不支持自动安装，请选择已有 PDF2zh 环境。')
-    if (this.running || this.arxiv.busy()) throw new DomainError('VALIDATION', '请等待当前文献任务完成后再安装翻译引擎。')
+    if (this.busy()) throw new DomainError('VALIDATION', '请等待当前文献任务完成后再安装翻译引擎。')
     const directory = await this.engineInstaller.install()
     this.repo.setSetting('translation.directory', directory)
     this.changed()
@@ -160,7 +195,7 @@ export class LibraryService {
     if (result.canceled || !directory) return null
     if (!translatorExecutable(directory))
       throw new DomainError('VALIDATION', '所选文件夹中未找到 pdf2zh_next.exe；可选择官方压缩包解压后的根目录或 pdf2zh 文件夹。')
-    if (this.running || this.engineInstaller?.busy()) throw new DomainError('VALIDATION', '翻译或引擎安装完成后再更换服务文件夹。')
+    if (this.busy()) throw new DomainError('VALIDATION', '翻译或引擎安装完成后再更换服务文件夹。')
     this.repo.setSetting('translation.directory', directory)
     this.changed()
     void this.pump()
@@ -216,17 +251,20 @@ export class LibraryService {
     void this.pump()
     return report
   }
-  private async saveOwned(bytes: Buffer, fields: PublicationInput | ArxivEntry, day?: string) {
-    const collection = day ? 'arxiv' : 'publication'
+  private async saveOwned(bytes: Buffer, fields: PublicationInput | ArxivEntry | DailyPaper, day?: string, fromPaperDaily = false) {
+    const collection = fromPaperDaily ? 'library' : day ? 'arxiv' : 'publication'
     const sha256 = createHash('sha256').update(bytes).digest('hex')
-    if (this.repo.byHash(sha256, collection)) throw new DomainError('VALIDATION', '这份 PDF 已在当前页面中，请编辑已有卡片。')
+    const existing = this.repo.byHash(sha256, collection) ?? (fromPaperDaily
+      ? this.repo.papers().find(paper => 'arxivId' in fields && !!fields.arxivId && paper.arxivId === fields.arxivId) ?? this.repo.byHash(sha256, 'arxiv') : undefined)
+    if (existing && fromPaperDaily) return existing
+    if (existing) throw new DomainError('VALIDATION', '这份 PDF 已在当前页面中，请编辑已有卡片。')
     const now = new Date().toISOString()
     const paper: Paper = {
-      ...paperMetadataDefaults, ...fields, id: randomUUID(), collection, collectedDate: day ?? '', folderId: null,
+      ...paperMetadataDefaults, ...fields, arxivId: !fromPaperDaily && 'arxivId' in fields ? fields.arxivId ?? null : null, id: randomUUID(), collection, collectedDate: day ?? '', folderId: null,
       title: fields.title, authors: fields.authors, journal: fields.journal, year: fields.publishedDate.slice(0, 4),
       honors: 'honors' in fields ? [...fields.honors] : [],
       notes: 'notes' in fields ? fields.notes : '', originalName: `${Array.from(fields.title).filter((char) => char.charCodeAt(0) >= 32).join('').replace(/[<>:"/\\|?*]/g, '_').slice(0, 140)}.pdf`,
-      sourcePath: '', translatedPath: null, sha256, translationStatus: 'idle', translationError: '', metadataStatus: 'ready', metadataSource: day ? 'arXiv' : '手动填写',
+      sourcePath: '', translatedPath: null, sha256, translationStatus: 'idle', translationError: '', metadataStatus: 'ready', metadataSource: 'source' in fields ? fields.source : day ? 'arXiv' : '手动填写',
       pageCount: 0, readPage: 0, translatedReadPage: 0, lastReadAt: null, addedAt: now, updatedAt: now
     }
     const directory = this.storage.paperDirectory(paper)
@@ -235,7 +273,7 @@ export class LibraryService {
     try {
       await writeFile(paper.sourcePath, bytes, { flag: 'wx' })
       if (this.stopping) throw new Error('应用已关闭，保存未完成。')
-      if (day) this.repo.insertArxiv(paper); else this.repo.insert(paper)
+      if (collection === 'arxiv') this.repo.insertArxiv(paper); else this.repo.insert(paper)
     } catch (error) {
       await rm(directory, { recursive: true, force: true }).catch(() => undefined)
       throw error
@@ -322,6 +360,7 @@ export class LibraryService {
     if (paper.translationStatus === 'ready') throw new DomainError('VALIDATION', '此文献已有中英对照版。')
     const health = await this.health()
     if (!health.installed || !health.configured) throw new DomainError('VALIDATION', health.message)
+    if (['queued', 'translating', 'ready'].includes(this.repo.paper(id).translationStatus)) return
     this.repo.translation(id, 'queued')
     this.changed()
     void this.pump()
@@ -333,10 +372,11 @@ export class LibraryService {
       this.changed()
       return
     }
-    if (paper.translationStatus !== 'translating' || this.activePaperId !== id)
+    if (paper.translationStatus !== 'translating' || !this.activeTranslations.has(id))
       throw new DomainError('VALIDATION', '此文献当前不在翻译队列中。')
     this.cancelledTranslations.add(id)
-    if (this.activeChild) terminateTranslator(this.activeChild)
+    const child = this.activeTranslations.get(id)
+    if (child) terminateTranslator(child)
   }
   setTranslationPaused(paused: boolean) {
     this.translationPaused = paused
@@ -349,48 +389,62 @@ export class LibraryService {
     this.changed()
   }
   private async pump() {
-    if (this.running || this.stopping) return
+    if (this.running || this.stopping || this.translationPaused || this.activeTranslations.size >= PARALLEL_TRANSLATIONS) return
+    if (!this.repo.papers().some(paper => paper.translationStatus === 'queued')) return
     this.running = true
     try {
-      while (!this.stopping) {
-        if (this.translationPaused) break
-        const paper = this.repo.papers().filter((item) => item.translationStatus === 'queued')
-          .sort((a, b) => a.translationOrder - b.translationOrder || a.addedAt.localeCompare(b.addedAt))[0]
-        if (!paper) break
-        const health = await this.health()
-        if (!health.installed || !health.configured) break
-        const profile = this.translationProfiles.runtimeActive()
-        this.repo.translation(paper.id, 'translating')
-        this.activePaperId = paper.id
-        const startedAt = new Date().toISOString()
-        this.publishProgress({ paperId: paper.id, stage: '正在启动翻译引擎', percent: null, current: null, total: null, startedAt, updatedAt: startedAt })
-        this.changed()
-        try {
-          const outputDirectory = join(dirname(paper.sourcePath), 'jobs', randomUUID())
-          const output = await runTranslation(this.directory(), paper.sourcePath, outputDirectory, profile, (child) => {
-            this.activeChild = child
-            if (this.stopping) terminateTranslator(child)
-          }, (progress) => this.updateProgress(paper.id, progress))
-          if (this.stopping) break
-          if (this.cancelledTranslations.has(paper.id)) throw new Error('翻译已取消。')
-          // Verify a real PDF exists before declaring completion or associating it with a card.
-          const bytes = await this.pdfBytes(output)
-          const target = join(dirname(paper.sourcePath), 'bilingual.pdf')
-          await writeFile(target, bytes)
-          this.repo.translation(paper.id, 'ready', '', target)
-        } catch (error) {
-          if (!this.stopping) this.repo.translation(paper.id,
-            this.cancelledTranslations.has(paper.id) ? 'interrupted' : 'failed',
-            this.cancelledTranslations.has(paper.id) ? '翻译已取消，原文保持不变；可稍后重试。' : message(error).slice(0, 700))
-        } finally {
-          this.cancelledTranslations.delete(paper.id)
-          this.activeChild = null
-          this.activePaperId = null
-          this.publishProgress(null)
+      const health = await this.health()
+      if (this.stopping || this.translationPaused) return
+      if (!health.installed || !health.configured) {
+        if (this.translationQueueError !== health.message) {
+          this.translationQueueError = health.message
+          this.changed()
         }
-        if (!this.stopping) this.changed()
+        return
       }
+      const profile = this.translationProfiles.runtimeActive()
+      if (profile.id !== health.activeProfile.id) {
+        queueMicrotask(() => { void this.pump() })
+        return
+      }
+      const capacity = (profile.provider === 'codex-cli' ? PARALLEL_TRANSLATIONS : 2) - this.activeTranslations.size
+      const queued = this.repo.papers().filter(paper => paper.translationStatus === 'queued')
+        .sort((a, b) => a.translationOrder - b.translationOrder || a.addedAt.localeCompare(b.addedAt))
+      this.translationQueueError = ''
+      for (const paper of queued.slice(0, Math.max(0, capacity))) void this.translatePaper(paper, health.serverDirectory, profile)
     } finally { this.running = false }
+  }
+  private async translatePaper(paper: Paper, directory: string, profile: ReturnType<TranslationProfileStore['runtimeActive']>) {
+    const { id } = paper
+    this.repo.translation(id, 'translating')
+    this.activeTranslations.set(id, null)
+    this.rateTrackers.set(id, new TranslationRateTracker())
+    const startedAt = new Date().toISOString()
+    this.publishProgress(id, { paperId: id, step: 'prepare', stage: '正在启动翻译引擎', percent: null, current: null, total: null, startedAt, updatedAt: startedAt }, true)
+    this.changed()
+    try {
+      const outputDirectory = join(dirname(paper.sourcePath), 'jobs', randomUUID())
+      const output = await runTranslation(directory, paper.sourcePath, outputDirectory, profile, child => {
+        this.activeTranslations.set(id, child)
+        if (this.stopping || this.cancelledTranslations.has(id)) terminateTranslator(child)
+      }, progress => this.updateProgress(id, progress))
+      if (this.stopping) return
+      const bytes = await this.pdfBytes(output)
+      if (this.stopping) return
+      if (this.cancelledTranslations.has(id)) throw new Error('翻译已取消。')
+      const target = join(dirname(paper.sourcePath), 'bilingual.pdf')
+      await writeFile(target, bytes)
+      if (!this.stopping) this.repo.translation(id, 'ready', '', target)
+    } catch (error) {
+      if (!this.stopping) this.repo.translation(id, this.cancelledTranslations.has(id) ? 'interrupted' : 'failed',
+        this.cancelledTranslations.has(id) ? '翻译已取消，可稍后重试。' : message(error).slice(0, 700))
+    } finally {
+      this.cancelledTranslations.delete(id)
+      this.activeTranslations.delete(id)
+      this.rateTrackers.delete(id)
+      this.publishProgress(id, null, true)
+      if (!this.stopping) { this.changed(); void this.pump() }
+    }
   }
   private file(id: string, variant: PaperVariant) {
     return this.storage.file(this.repo.paper(id), variant)
@@ -426,10 +480,13 @@ export class LibraryService {
   }
   stop() {
     this.arxiv.stop()
+    this.paperDaily.stop()
+    this.journalAbbreviations.stop()
     this.engineInstaller?.stop()
     this.stopping = true
-    this.publishProgress(null)
-    if (this.activeChild) terminateTranslator(this.activeChild)
+    this.progress.clear()
+    this.sendProgress()
+    for (const child of this.activeTranslations.values()) if (child) terminateTranslator(child)
     for (const paper of this.repo.papers()) {
       if (paper.translationStatus === 'translating')
         this.repo.translation(paper.id, 'interrupted', '应用在翻译完成前关闭，原文已保留。请稍后重试。')

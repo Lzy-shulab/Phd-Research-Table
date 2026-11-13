@@ -83,7 +83,7 @@ export function ImportantCountdowns() {
         <div className="countdown-detail"><strong title={item.title}>{item.title}</strong><span className="countdown-value">{time.expired ? '已到期' : remaining}</span><time dateTime={item.deadline}>{new Date(item.deadline).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })} 截止</time></div>
       </motion.article>
     })}</AnimatePresence></div>}
-    <Dialog open={editing} onOpenChange={open => { if (!saving) { setEditing(open); if (!open) reset() } }} title="重要事件倒计时" description="到达截止时间后自动移除；事件独立保存，不计入研究任务。" className="countdown-dialog">
+    <Dialog open={editing} onOpenChange={open => { if (!saving) { setEditing(open); if (!open) reset() } }} title="重要事件倒计时" description="到期后自动移除。" className="countdown-dialog">
       {items.length > 0 && <div className="countdown-management" aria-label="已保存的重要事件">{ordered.map(item => <div key={item.id} className={selected === item.id ? 'is-selected' : ''}><div><strong title={item.title}>{item.title}</strong><time dateTime={item.deadline}>{new Date(item.deadline).toLocaleString('zh-CN', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</time></div><Button variant="ghost" aria-label={`编辑倒计时 ${item.title}`} disabled={saving} onClick={() => { setSelected(item.id); setTitle(item.title); setDeadline(localInput(item.deadline)); setError('') }}>编辑</Button><Button variant="ghost" aria-label={`移除倒计时 ${item.title}`} disabled={saving} onClick={() => setRemoving(item)}><Trash2 size={15} /></Button></div>)}</div>}
       <form className="countdown-form" onSubmit={async event => {
       event.preventDefault(); if (saving) return

@@ -12,7 +12,7 @@
 [data-theme='dark'] .wallpaper-mist { background-image: radial-gradient(ellipse at 5% 10%, #30456a, transparent 68%), radial-gradient(ellipse at 94% 90%, #433753, transparent 68%), linear-gradient(135deg, #192536, #26263b); }
 [data-theme='dark'] .wallpaper-sage { background-image: radial-gradient(ellipse at 5% 10%, #325349, transparent 68%), radial-gradient(ellipse at 94% 90%, #45452d, transparent 65%), linear-gradient(135deg, #1c302a, #292e22); }
 [data-theme='dark'] .wallpaper-dusk { background-image: radial-gradient(ellipse at 5% 10%, #513854, transparent 68%), radial-gradient(ellipse at 94% 90%, #593c38, transparent 65%), linear-gradient(135deg, #282131, #362622); }
-.wallpaper-scrim { background: transparent; transition: background-color 180ms ease; }
+.wallpaper-scrim { background: color-mix(in srgb, var(--app-background) 50%, transparent); transition: background-color 180ms ease; }
 [data-background='custom'] .wallpaper-scrim { background: #edf1f415; }
 [data-theme='dark'][data-background='custom'] .wallpaper-scrim { background: #0d121635; }
 :root[data-background] { --surface-primary: color-mix(in srgb, var(--surface-solid) var(--panel-opacity, 75%), transparent); --glass-sidebar: var(--surface-primary); --glass-dock: var(--surface-primary); --glass-card: color-mix(in srgb, var(--surface-solid) var(--card-opacity, 34%), transparent); }
@@ -90,6 +90,31 @@
 .translation-queue-details { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-size: 0.857143rem; margin-top: 8px; line-height: 1.6; }
 .translation-queue-details > span:last-child { color: var(--text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .translation-stage { min-width: 0; }
+.translation-timing { display: flex; align-items: baseline; flex-wrap: wrap; justify-content: flex-end; gap: 5px 18px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.translation-timing > span { white-space: nowrap; }
+.translation-disclosure { flex-shrink: 0; gap: 5px; }
+.translation-disclosure svg { transition: transform 160ms ease-out; }
+.translation-disclosure[aria-expanded='true'] svg { transform: rotate(180deg); }
+.translation-expandable[hidden] { display: none; }
+.translation-expandable { padding-top: 14px; }
+.translation-step-list { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; list-style: none; margin: 0; padding: 16px 0; border-top: 1px solid var(--border-default); }
+.translation-step-list > li { display: flex; align-items: flex-start; gap: 8px; min-width: 0; color: var(--text-muted); }
+.translation-step-marker { display: grid; place-items: center; width: 22px; height: 22px; flex-shrink: 0; border-radius: 50%; background: var(--surface-secondary); }
+.translation-step-marker > i { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+.translation-step-marker .tiny-spinner { width: 12px; height: 12px; margin: 0; }
+.translation-step-list strong { display: block; font-size: .86rem; font-weight: 570; line-height: 1.6; }
+.translation-step-list small { display: block; font-size: .76rem; margin-top: 3px; }
+.translation-step-list [data-state='done'] { color: var(--text-secondary); }
+.translation-step-list [data-state='current'] { color: var(--text-primary); }
+.translation-step-list [data-state='current'] .translation-step-marker { background: var(--accent-soft); color: var(--accent); }
+.translation-step-list [data-state='current'] strong { font-weight: 650; }
+.translation-queue-empty { margin: 0; padding-bottom: 3px; font-size: .82rem; color: var(--text-muted); line-height: 1.6; }
+.translation-expandable > .translation-queue-list { max-height: 220px; overflow-y: auto; overscroll-behavior: contain; }
+@media (max-width: 1200px) {
+  .translation-step-list { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 16px; }
+  .translation-queue-heading > .translation-queue-title { flex-basis: 40%; }
+}
+@media (prefers-reduced-motion: reduce) { .translation-disclosure svg { transition: none; } }
 
 /* A calmer density: compact the summary, preserve card hierarchy, grow columns with text. */
 .library-search { min-width: 180px; }

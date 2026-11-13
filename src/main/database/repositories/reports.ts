@@ -3,9 +3,10 @@ import { eq } from 'drizzle-orm'
 import type { WorkbenchDatabase } from '../db'
 import { appSettings } from '../schema'
 import { DomainError } from '../../../domain/errors'
-import { defaultReportSettings, type ReportSettings, type ReportSnapshot, type StipendInput, type CheckinInput, type CheckinAbsenceInput } from '../../../shared/reports'
+import { defaultReportSettings, type ReportSettings, type ReportSnapshot, type StipendInput, type CheckinInput, type CheckinStart, type CheckinAbsenceInput } from '../../../shared/reports'
 import { readingDateInputSchema, readingDatesSchema, reportSettingsSchema, stipendInputSchema, stipendListSchema, checkinInputSchema, checkinListSchema, checkinDuration, checkinDayParts, checkinAbsenceInputSchema, checkinAbsenceListSchema } from '../../../domain/reports'
 import { LibraryRepository } from './library'
+import { checkinEndAt, checkinStartSchema, isOpenCheckin } from '../../../domain/reports'
 
 export const readingDatesKey = 'research.reading-dates.v1'
 export class ReportsRepository {
@@ -40,11 +41,23 @@ export class ReportsRepository {
     return item
   }
   deleteStipend(id: string) { this.write('research.stipends.v1', this.snapshot().stipends.filter(item => item.id !== id)) }
+  startCheckin(input: CheckinStart) {
+    const parsed = checkinStartSchema.parse(input), entries = this.snapshot().checkins
+    if (entries.some(isOpenCheckin)) throw new DomainError('VALIDATION', '请先结束正在进行的打卡。')
+    const start = new Date(`${parsed.date}T${parsed.startTime}:00`).getTime()
+    if (start > Date.now()) throw new DomainError('VALIDATION', '开始时间不能晚于现在。')
+    if (entries.some(entry => (checkinEndAt(entry) ?? 0) > start)) throw new DomainError('VALIDATION', '这个开始时间与已有打卡重叠。')
+    const item = { ...parsed, id: randomUUID(), createdAt: new Date().toISOString(), durationMinutes: 0 }
+    this.write('research.checkins.v1', checkinListSchema.parse([...entries, item]))
+    return item
+  }
   saveCheckin(input: CheckinInput, id?: string) {
     const parsed = checkinInputSchema.parse(input), entries = this.snapshot().checkins
     const previous = entries.find(item => item.id === id)
     if (id && !previous) throw new DomainError('NOT_FOUND', '此打卡记录已不存在。')
-    const item = { ...parsed, durationMinutes: checkinDuration(parsed.startTime, parsed.endTime, parsed.endsNextDay), id: previous?.id ?? randomUUID(), createdAt: previous?.createdAt ?? new Date().toISOString() }
+    const finishing = previous && isOpenCheckin(previous)
+    const item = { ...parsed, reminderEnabled: finishing ? false : parsed.reminderEnabled ?? previous?.reminderEnabled, durationMinutes: checkinDuration(parsed.startTime, parsed.endTime, parsed.endsNextDay), id: previous?.id ?? randomUUID(), createdAt: previous?.createdAt ?? new Date().toISOString() }
+    if (finishing && checkinEndAt(item)! > Date.now()) throw new DomainError('VALIDATION', '结束时间不能晚于现在。')
     const others = entries.filter(old => old.id !== id)
     for (const part of checkinDayParts(item)) {
       const recorded = others.flatMap(checkinDayParts).filter(old => old.date === part.date).reduce((sum, old) => sum + old.minutes, 0)
@@ -57,6 +70,7 @@ export class ReportsRepository {
     }
     const [start, end] = bounds(item)
     if (others.some(old => {
+      if (isOpenCheckin(old)) return end > new Date(`${old.date}T${old.startTime}:00`).getTime()
       if (!old.startTime || !old.endTime) return false
       const [from, to] = bounds(old)
       return start < to && end > from

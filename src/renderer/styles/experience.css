@@ -48,15 +48,15 @@ button { transition: background-color 160ms var(--motion-ease), color 160ms var(
 .reader-toolbar { grid-template-columns: minmax(140px, 1fr) auto minmax(250px, 1fr); gap: 10px; }
 .reader-highlight-hint { display: none; }
 .reader-center-tools { min-width: 0; }
-.reader-with-notes { display: grid; grid-template-columns: minmax(0, 1fr) clamp(270px, 21vw, 330px); }
+.reader-with-notes { display: grid; grid-template-columns: minmax(0, 1fr) clamp(190px, 15vw, 235px); }
 .reader-with-notes.notes-collapsed { grid-template-columns: minmax(0, 1fr); }
 .reader-scroll { padding: 22px 24px; scrollbar-gutter: stable; }
 .reader-notes-panel { min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--surface-raised); border-left: 1px solid var(--border-default); }
-.reader-notes-panel > header { display: flex; align-items: center; gap: 8px; padding: 16px; border-bottom: 1px solid var(--border-default); }
+.reader-notes-panel > header { display: flex; align-items: center; gap: 8px; padding: 13px 12px; border-bottom: 1px solid var(--border-default); }
 .reader-notes-panel h2 { font-size: 1rem; font-weight: 650; }
 .reader-notes-panel > header > svg { color: var(--accent); flex-shrink: 0; }
 .reader-note-status { margin-left: auto; font-size: .72rem; white-space: nowrap; }
-.reader-notes-scroll { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 16px; display: grid; align-content: start; gap: 24px; }
+.reader-notes-scroll { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 12px; display: grid; align-content: start; gap: 24px; }
 .reader-note-field { display: grid; gap: 8px; font-size: .84rem; font-weight: 600; }
 .reader-note-field textarea { width: 100%; min-height: 150px; resize: vertical; padding: 12px; font-size: .85rem; font-weight: 400; line-height: 1.7; background: var(--surface-inset); border: 1px solid var(--border-default); border-radius: 8px; }
 .reader-annotations-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }

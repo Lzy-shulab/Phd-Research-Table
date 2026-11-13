@@ -13,7 +13,8 @@ vi.mock('electron', () => ({
   safeStorage: { isEncryptionAvailable: () => false, encryptString: vi.fn(), decryptString: vi.fn() }
 }))
 vi.mock('../src/main/library/translator', () => ({ runTranslation: engine.run, translatorExecutable: engine.installed, translationConfigTemplate: engine.config, terminateTranslator: engine.stop }))
-import { LibraryService } from '../src/main/library/service'
+vi.mock('../src/main/library/codex-translator', () => ({ codexTranslationStatus: async () => ({ installed: true, loggedIn: true }) }))
+import { LibraryService, type LibraryServiceRuntime } from '../src/main/library/service'
 import type { SecretProtector } from '../src/main/library/translation-profiles'
 import { defaultArxivSettings, localDay } from '../src/shared/arxiv'
 import type { PublicationInput } from '../src/shared/types'
@@ -24,10 +25,11 @@ const protector: SecretProtector = {
   encrypt: (value) => Buffer.from(`protected:${value}`).toString('base64'),
   decrypt: (value) => Buffer.from(value, 'base64').toString('utf8').replace(/^protected:/, '')
 }
-function setup(withWindow = false) {
+function setup(withWindow = false, callbacks?: Pick<LibraryServiceRuntime, 'onChanged' | 'onProgress'>) {
   const directory = mkdtempSync(join(tmpdir(), 'library-service-'))
   const connection = openDatabase(join(directory, 'workbench.sqlite'), resolve('src/main/database/migrations'))
-  const service = new LibraryService(connection, () => withWindow ? { isDestroyed: () => false, webContents: { send: vi.fn() } } as unknown as BrowserWindow : null, protector)
+  const service = new LibraryService(connection, () => withWindow ? { isDestroyed: () => false, webContents: { send: vi.fn() } } as unknown as BrowserWindow : null, protector,
+    callbacks ? { translationEngineRoot: join(directory, 'managed-engine'), translationEngineFetcher: fetch, ...callbacks } : undefined)
   service.arxiv.setTranslator(async id => ({ titleZh: '高光谱图像测试', abstractZh: '这是一段用于文献服务测试的高光谱摘要。', generatedAt: new Date().toISOString(), sourceAbstract: service.arxiv.candidate(id)!.abstract }))
   service.translationProfiles.save({ id: 'siliconflow-api', name: 'SiliconFlow 自有额度', provider: 'siliconflow', model: 'Qwen/Qwen3-8B', baseUrl: 'https://api.siliconflow.cn/v1', apiKey: 'test-key' })
   const config = join(directory, 'engine', 'config')
@@ -55,6 +57,54 @@ afterEach(async () => {
   }
 })
 describe('Library jobs with a stub translation process', () => {
+  it('runs three Codex jobs, cancels only the selected job and fills its slot from the queue', async () => {
+    const { directory, service } = setup()
+    service.translationProfiles.activate('codex-cli')
+    const finish = new Map<string, () => void>()
+    const fail = new Map<object, () => void>()
+    engine.run.mockImplementation((_directory, input, output, _profile, onChild) =>
+      new Promise<string>((resolve, reject) => {
+        const child = { source: input }
+        fail.set(child, () => reject(Error('Job stopped')))
+        onChild(child)
+        finish.set(input, () => { void successfulEngine(_directory, input, output).then(resolve, reject) })
+      }))
+    engine.stop.mockImplementation(child => fail.get(child)?.())
+    const files = Array.from({ length: 4 }, (_, index) => {
+      const source = join(directory, `parallel-${index}.pdf`)
+      writeFileSync(source, `%PDF-1.7\nparallel fixture ${index}\n%%EOF`)
+      return source
+    })
+    await service.importPapers(files, null, true)
+    await vi.waitFor(() => expect(service.translationState().activeProgress).toHaveLength(3))
+    const before = service.snapshot().papers
+    const queued = before.find(paper => paper.translationStatus === 'queued')!
+    const cancelled = before.find(paper => paper.translationStatus === 'translating')!
+    service.cancelTranslation(cancelled.id)
+    await vi.waitFor(() => {
+      expect(service.repo.paper(cancelled.id).translationStatus).toBe('interrupted')
+      expect(service.repo.paper(queued.id).translationStatus).toBe('translating')
+      expect(service.translationState().activeProgress).toHaveLength(3)
+    })
+    for (const paper of service.repo.papers().filter(item => item.translationStatus === 'translating')) finish.get(paper.sourcePath)?.()
+    await vi.waitFor(() => expect(service.repo.papers().filter(paper => paper.translationStatus === 'ready')).toHaveLength(3))
+    expect(engine.stop).toHaveBeenCalledTimes(1)
+  })
+  it('publishes real engine progress and completion to desktop consumers without a main window', async () => {
+    const changed = vi.fn(), progress = vi.fn()
+    const { service, source } = setup(false, { onChanged: changed, onProgress: progress })
+    engine.run.mockImplementation(async (directory, input, output, _profile, _child, onProgress) => {
+      onProgress({ stage: '翻译正文', percent: 42, current: 21, total: 50 })
+      await new Promise(resolve => setTimeout(resolve, 230))
+      return successfulEngine(directory, input, output)
+    })
+    await service.importPapers([source], null, true)
+    await vi.waitFor(() => expect(service.snapshot().papers[0]?.translationStatus).toBe('ready'))
+    expect(progress).toHaveBeenCalledWith(expect.objectContaining({ percent: 42, stage: '翻译正文' }))
+    expect(progress).toHaveBeenLastCalledWith(null)
+    expect(changed).toHaveBeenCalled()
+    expect(service.translationState().progress).toBeNull()
+  })
   it('keeps papers idle when translation is requested before an engine is configured', async () => {
     const { service, source } = setup()
     await service.importPapers([source], null, false)

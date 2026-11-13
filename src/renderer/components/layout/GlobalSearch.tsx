@@ -65,12 +65,12 @@ export function GlobalSearch() {
     }
     setOpen(false)
   }
-  return <Dialog open={open} onOpenChange={setOpen} title="全局搜索" description="搜索任务、文献、科研成果和投稿记录。">
+  return <Dialog open={open} onOpenChange={setOpen} title="全局搜索" >
     <div className="global-search-input"><Search size={18} /><input ref={input} aria-label="全局搜索" placeholder="输入标题、作者、期刊、稿号或任务内容" value={query} onChange={(event) => setQuery(event.target.value)} /></div>
     <div className="global-search-results" role="listbox" aria-label="搜索结果">
-      {!query.trim() ? <p className="global-search-empty">输入关键词开始搜索。可随时按 Ctrl+K 返回这里。</p>
-        : results.length ? results.map((result) => { const Icon = icons[result.type]; return <button key={`${result.type}:${result.id}`} role="option" onClick={() => go(result)}><Icon size={17} /><span><strong>{result.title}</strong><small>{result.detail || '暂无补充信息'}</small></span><em>{labels[result.type]}</em></button> })
-          : <p className="global-search-empty">没有匹配的记录。清除关键词可重新搜索。</p>}
+      {!query.trim() ? null
+        : results.length ? results.map((result) => { const Icon = icons[result.type]; return <button key={`${result.type}:${result.id}`} role="option" onClick={() => go(result)}><Icon size={17} /><span><strong>{result.title}</strong>{result.detail && <small>{result.detail}</small>}</span><em>{labels[result.type]}</em></button> })
+          : <p className="global-search-empty">没有匹配的记录</p>}
     </div>
   </Dialog>
 }

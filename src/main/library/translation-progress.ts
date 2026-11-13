@@ -1,10 +1,12 @@
 import { StringDecoder } from 'node:string_decoder'
+import { translationStepForStage, type TranslationStep } from '../../shared/translation-progress'
 
 export interface EngineProgress {
   stage: string
   percent: number | null
   current: number | null
   total: number | null
+  step?: TranslationStep
 }
 const stages: Record<string, string> = {
   'Preparing translation engine': '正在启动翻译引擎',
@@ -30,8 +32,11 @@ export function parseEngineProgress(line: string): EngineProgress | null {
     const value = JSON.parse(line.slice(prefix.length)) as Record<string, unknown>
     if (!value || typeof value.stage !== 'string') return null
     const rawPercent = count(value.percent)
+    const stage = stages[value.stage] ?? '正在处理文献'
+    const step = translationStepForStage(stage)
     return {
-      stage: stages[value.stage] ?? '正在处理文献',
+      stage,
+      ...(step ? { step } : {}),
       // 100% is only shown after the main process validates and attaches the output PDF.
       percent: rawPercent === null ? null : Math.min(99, Math.floor(rawPercent)),
       current: count(value.current), total: count(value.total)

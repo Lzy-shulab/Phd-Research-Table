@@ -19,7 +19,7 @@ export function DateInput({ label, value, onChange }: { label: string; value: st
       <button type="button" className="date-input-trigger" aria-label={`选择${label}`} onClick={() => setOpen(true)}>
         <CalendarDays size={14} />
       </button>
-      <Dialog open={open} onOpenChange={setOpen} title={`选择${label}`} description="选择一个日期，也可直接在日期栏中输入。">
+      <Dialog open={open} onOpenChange={setOpen} title={`选择${label}`}>
         <div className="date-picker"><MiniCalendar key={open ? value : 'closed'} value={value} onSelect={choose} /></div>
         <div className="dialog-actions">
           <Button onClick={() => choose('')}>清除日期</Button>

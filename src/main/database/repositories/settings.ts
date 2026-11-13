@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { eq, ne } from 'drizzle-orm'
 import { appSettings } from '../schema'
 import type { WorkbenchDatabase } from '../db'
 import { appearanceSchema, windowStateSchema } from '../../../domain/validation'
@@ -19,10 +19,11 @@ export class SettingsRepository {
     }
   }
   private write(key: string, value: unknown): void {
+    const serialized = JSON.stringify(value)
     this.db
       .insert(appSettings)
-      .values({ key, value: JSON.stringify(value) })
-      .onConflictDoUpdate({ target: appSettings.key, set: { value: JSON.stringify(value) } })
+      .values({ key, value: serialized })
+      .onConflictDoUpdate({ target: appSettings.key, set: { value: serialized }, setWhere: ne(appSettings.value, serialized) })
       .run()
   }
   getAppearance(): Appearance {
@@ -51,4 +52,16 @@ export class SettingsRepository {
   getTaskTemplates(): unknown { return this.read('planner.templates') }
   setTaskTemplates(value: unknown): void { this.write('planner.templates', value) }
   setEncouragement(value: unknown): void { this.write('daily.encouragement', value) }
+  getWidget(): unknown { return this.read('desktop.widget') }
+  setWidget(value: unknown): void { this.write('desktop.widget', value) }
+  getWidgetWeather(): unknown { return this.read('desktop.widget.weather') }
+  setWidgetWeather(value: unknown): void { this.write('desktop.widget.weather', value) }
+  getWaterReminder(): unknown { return this.read('desktop.water-reminder') }
+  setWaterReminder(value: unknown): void { this.write('desktop.water-reminder', value) }
+  getGpuAlerts(): unknown { return this.read('desktop.gpu-alerts') }
+  setGpuAlerts(value: unknown): void { this.write('desktop.gpu-alerts', value) }
+  getDesktopNotices(): unknown { return this.read('desktop.notices') }
+  setDesktopNotices(value: unknown): void { this.write('desktop.notices', value) }
+  getGpuLogin(): unknown { return this.read('desktop.gpu-login') }
+  setGpuLogin(value: string | null): void { this.write('desktop.gpu-login', value) }
 }

@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { asc, desc, eq, sql } from 'drizzle-orm'
 import { submissions, submissionStages } from '../schema'
 import type { WorkbenchDatabase } from '../db'
-import type { Submission, SubmissionInput, SubmissionStage } from '../../../shared/types'
+import type { Submission, SubmissionInput, SubmissionProgressPatch, SubmissionStage } from '../../../shared/types'
 import { DomainError } from '../../../domain/errors'
 import { submissionSchema } from '../../../domain/submissions'
 
@@ -67,9 +67,14 @@ export class SubmissionRepository {
     if (foreignId) throw new DomainError('VALIDATION', '投稿状态记录不属于当前投稿。')
     const now = new Date(Math.max(Date.now(), Date.parse(row.updatedAt) + 1)).toISOString()
     const { stages, ...details } = parsed
+    const sameStages = stages.length === currentStages.length && stages.every((stage, index) => {
+      const current = currentStages[index]!
+      return stage.id === current.id && stage.name === current.name && stage.occurredOn === current.occurredOn
+    })
     const retained = new Set(stages.flatMap((stage) => stage.id ? [stage.id] : []))
     this.db.transaction((tx) => {
       tx.update(submissions).set({ ...details, submittedDate: stages[0]?.occurredOn ?? null, updatedAt: now }).where(eq(submissions.id, id)).run()
+      if (sameStages) return
       // Move existing positions out of the target range before applying a reorder.
       tx.update(submissionStages).set({ position: sql`${submissionStages.position} + 1000` })
         .where(eq(submissionStages.submissionId, id)).run()
@@ -82,6 +87,18 @@ export class SubmissionRepository {
           occurredOn: stage.occurredOn, position, createdAt: now, updatedAt: now }).run()
       }
     })
+    return this.get(id)
+  }
+  updateProgress(id: string, patch: SubmissionProgressPatch) {
+    const { title, journal, manuscriptId, stages, revisionDueDate, reminderEnabled, reminderDays, notes } = this.get(id)
+    return this.update(id, {
+      title, journal, manuscriptId, stages: stages.map(({ id, name, occurredOn }) => ({ id, name, occurredOn })),
+      revisionDueDate, reminderEnabled, reminderDays, notes, ...patch
+    })
+  }
+  setRevisionCompleted(id: string, completed: boolean) {
+    this.get(id)
+    this.db.update(submissions).set({ revisionCompleted: completed, updatedAt: new Date().toISOString() }).where(eq(submissions.id, id)).run()
     return this.get(id)
   }
   syncLinkedTask(taskId: string, completed: boolean) {

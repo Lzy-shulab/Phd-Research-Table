@@ -11,7 +11,7 @@ export class SubmissionReminders {
   private stopped = false
   private notifications = new Set<Notification>()
   constructor(private readonly connection: () => DatabaseConnection, private readonly window: () => BrowserWindow | null,
-    private readonly paused: () => boolean, private readonly changed: () => void) {}
+    private readonly paused: () => boolean, private readonly changed: () => void, private readonly openSubmissions?: () => void) {}
   snapshot() { return { notificationsSupported: Notification.isSupported() && process.env.WORKBENCH_DISABLE_NOTIFICATIONS !== '1', notificationError: this.error } }
   start() {
     if (this.timer || this.stopped) return
@@ -33,6 +33,7 @@ export class SubmissionReminders {
           silent: false, timeoutType: 'never' })
         this.notifications.add(notification)
         notification.on('click', () => {
+          if (this.openSubmissions) { this.openSubmissions(); return }
           const window = this.window()
           if (window && !window.isDestroyed()) { if (window.isMinimized()) window.restore(); window.show(); window.focus(); window.webContents.send('submission:open') }
         })

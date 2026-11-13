@@ -22,9 +22,9 @@ export function ProjectsWorkspace() {
     .map((group) => ({ ...group, visibleTasks: group.name.toLowerCase().includes(search) ? group.tasks : group.tasks.filter((task) => `${task.title} ${task.description}`.toLowerCase().includes(search)) }))
     .filter((group) => !search || group.name.toLowerCase().includes(search) || group.visibleTasks.length)
   return <main className="planner-workspace projects-workspace">
-    <header className="workspace-header"><div><div className="workspace-breadcrumb">研究计划<span>/</span>全部项目</div>
+    <header className="workspace-header"><div>
       <div className="heading-line"><h1>全部项目</h1><span className="library-count">{projects.length} 个</span></div>
-      <p>展开一个项目，看到其中每一项研究任务。</p></div>
+      </div>
       <Button variant="primary" onClick={() => setCreating(true)}><Plus size={16} />新建项目</Button></header>
     <div className="workspace-body">
       <div className="projects-toolbar"><span>{tasks.length} 项任务<span className="text-divider">·</span>{tasks.filter((task) => task.status === 'completed').length} 项已完成</span>
@@ -42,7 +42,7 @@ export function ProjectsWorkspace() {
             <button className="project-drawer-toggle" aria-expanded={open} aria-controls={`project-tasks-${group.key}`} onClick={() => setFolds({ ...folds, [group.key]: open })}>
               <motion.span className="project-chevron" animate={{ rotate: open ? 90 : 0 }} transition={{ duration: reduced ? 0 : 0.2 }}><ChevronRight size={17} /></motion.span>
               <span className={`drawer-folder project-${group.project?.colorKey ?? 'slate'}`}><FolderOpen size={21} strokeWidth={1.6} /></span>
-              <span className="drawer-project-heading"><strong>{group.name}</strong><small>{group.project?.description || (group.project ? '项目中的全部任务' : '这些任务可以在详情中补充归属')}</small></span>
+              <span className="drawer-project-heading"><strong>{group.name}</strong>{group.project?.description && <small>{group.project.description}</small>}</span>
               {group.project?.archivedAt && <span className="quiet-badge"><Archive size={11} />已归档</span>}
               <span className="drawer-count">{group.tasks.length} 项任务</span><span className="drawer-completion">{completed} / {group.tasks.length} 已完成</span>
             </button>
@@ -55,7 +55,7 @@ export function ProjectsWorkspace() {
           </motion.section>
         })}
       </div>
-      {!groups.length && <div className="empty-state"><div className="empty-icon"><Layers3 size={26} /></div><h2>{search ? '没有匹配的项目或任务。' : '从第一个研究项目开始。'}</h2><p>{search ? '换个关键词试试。' : '为课题建立项目，再逐步安排任务。'}</p>{!search && <Button onClick={() => setCreating(true)}><Plus size={15} />新建项目</Button>}</div>}
+      {!groups.length && <div className="empty-state"><div className="empty-icon"><Layers3 size={26} /></div><h2>{search ? '没有匹配的项目或任务。' : '从第一个研究项目开始。'}</h2>{!search && <Button onClick={() => setCreating(true)}><Plus size={15} />新建项目</Button>}</div>}
     </div>
     {creating && <ProjectDialog onClose={() => setCreating(false)} />}
   </main>

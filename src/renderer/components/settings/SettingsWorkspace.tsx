@@ -9,6 +9,7 @@ import { AssistantSettings } from './AssistantSettings'
 import { UpdateSettings } from './UpdateSettings'
 import { TranslationSettings } from '../literature/TranslationSettings'
 import { SettingsHeading } from './SettingsHeading'
+import { WidgetSettings } from './WidgetSettings'
 
 const locations = [
   { kind: 'library', label: '文献 PDF', description: '保存手动导入的文献及对应译文。', icon: Library },
@@ -67,17 +68,18 @@ export function SettingsWorkspace() {
   }
   return <main className="settings-workspace">
     <header className="workspace-header"><div>
-      <div className="workspace-breadcrumb">设置<span>/</span>外观、AI 与文件保存</div>
+      
       <div className="heading-line"><h1>设置</h1></div>
-      <p>让显示更舒适，让文件各有归处。</p>
+      
     </div></header>
     <div className="settings-body">
       <AppearanceSettings />
+      <WidgetSettings />
       <AssistantSettings />
-      <section className="storage-section translation-settings-entry settings-action-card"><SettingsHeading icon={Languages} title="全文翻译配置"><p>单独选择 PDF2zh 引擎、服务和模型；与计划助手配置互不覆盖。</p></SettingsHeading><Button onClick={() => setTranslationSettings(true)}>打开全文翻译设置</Button></section>
+      <section className="storage-section translation-settings-entry settings-action-card"><SettingsHeading icon={Languages} title="全文翻译配置"></SettingsHeading><Button onClick={() => setTranslationSettings(true)}>打开全文翻译设置</Button></section>
       <UpdateSettings />
       <section className="storage-section" id="storage-settings" aria-labelledby="storage-heading">
-        <SettingsHeading icon={HardDrive} title="保存位置" id="storage-heading"><p>选择后自动保存，下次打开工作台继续使用。</p></SettingsHeading>
+        <SettingsHeading icon={HardDrive} title="保存位置" id="storage-heading"></SettingsHeading>
         <div className="storage-list">
           {locations.map(({ kind, label, description, icon: Icon }) => <div className="storage-row" key={kind} data-testid={`storage-${kind}`}>
             <div className="storage-row-heading"><span className="storage-icon"><Icon size={20} strokeWidth={1.6} /></span><div><h3>{label}</h3><p>{description}</p></div></div>
@@ -87,18 +89,18 @@ export function SettingsWorkspace() {
             </div>
           </div>)}
         </div>
-        <p className="storage-note">更改位置仅影响之后新增的文件。已有文件保留在原位置，仍可阅读和导出；译文始终跟随对应原文。请保留仍在使用的旧文件夹。</p>
+        <p className="storage-note">新位置用于之后新增的文件；已有文件留在原位置。</p>
       </section>
       <div className="storage-feedback" aria-live="polite">
         {error ? <div className="field-error" role="alert">{error}{!snapshot && <Button onClick={() => void load()}>重试</Button>}</div>
           : saved && <p className="storage-saved"><Check size={16} />{saved}</p>}
       </div>
       <section className="storage-database" aria-labelledby="database-heading"><Database size={18} /><div><h2 id="database-heading">工作台数据</h2>
-        <p>任务、笔记、分类及投稿记录保存在这里。更改时会校验并迁移现有数据，PDF 保存位置保持各自设置。</p><p className="storage-path">{snapshot?.databasePath ?? '正在读取…'}</p></div>
+        <p>更改位置会迁移工作台数据。</p><p className="storage-path">{snapshot?.databasePath ?? '正在读取…'}</p></div>
         <div className="storage-actions"><Button disabled={!snapshot || !!busy} onClick={() => void reveal('database')} aria-label="打开工作台数据文件夹"><FolderOpen size={15} />打开</Button>
           <Button disabled={!snapshot || !!busy} onClick={() => void chooseDatabase()} aria-label="更改工作台数据保存位置">{busy === 'database' ? '正在迁移…' : '更改位置'}</Button></div>
       </section>
-      <section className="storage-metadata"><div><h2>文献信息自动读取</h2><p>导入后读取 PDF 标题、作者等资料，允许使用 DOI 或标题向 Crossref 查询公开书目；不会上传 PDF 全文。</p></div>
+      <section className="storage-metadata"><div><h2>文献信息自动读取</h2><p>使用 DOI 或标题查询 Crossref 公开书目。</p></div>
         <label><span>允许联网补全</span><input type="checkbox" role="switch" aria-label="允许联网补全文献信息" checked={metadataOnline} onChange={(event) => void libraryAction(window.workbench.setMetadataOnline(event.target.checked))} /></label></section>
       {translationSettings && <TranslationSettings onClose={() => setTranslationSettings(false)} />}
     </div>

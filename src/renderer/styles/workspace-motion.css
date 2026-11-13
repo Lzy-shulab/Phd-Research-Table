@@ -1,0 +1,145 @@
+.main-region { flex-direction: column; }
+.workspace-frame { flex: 1; min-height: 0; min-width: 0; position: relative; display: flex; overflow: hidden; }
+.workspace-stage { min-width: 0; }
+.workspace-stage[inert] { z-index: 0; }
+.workspace-stage:not([inert]) { z-index: 1; }
+.workbench-disclosure { overflow: clip; }
+
+.main-region > .dock-wrap {
+  position: relative;
+  inset: auto;
+  z-index: 5;
+  width: 100%;
+  max-width: none;
+  flex: none;
+  padding: 0;
+  transform: none;
+  filter: none;
+  pointer-events: auto;
+}
+.main-region > .dock-wrap .dock {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  align-items: stretch;
+  gap: clamp(2px, .4vw, 7px);
+  width: 100%;
+  padding: 7px max(10px, calc((100% - 910px) / 2));
+  border: 0;
+  border-top: 1px solid var(--border-default);
+  border-radius: 0;
+  background: color-mix(in srgb, var(--surface-inset) 66%, transparent);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+.main-region .dock .dock-item {
+  width: auto;
+  min-width: 0;
+  min-height: 42px;
+  padding: 6px 4px;
+  gap: 7px;
+  border-radius: var(--control-radius);
+  color: var(--text-secondary);
+  font-size: .86rem;
+  white-space: nowrap;
+  background: transparent;
+  box-shadow: none;
+}
+.main-region .dock .dock-item:hover:not(.selected) { color: var(--text-primary); background: var(--surface-hover); }
+.main-region .dock .dock-item.selected { color: var(--text-primary); font-weight: 650; }
+.main-region .dock .dock-item .workspace-glyph {
+  width: auto;
+  height: auto;
+  color: currentColor;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+.main-region .dock .dock-item .workspace-glyph svg { width: 17px; height: 17px; transform: none; }
+.main-region .dock .dock-item.selected .workspace-glyph { color: var(--accent); }
+.main-region .dock-selection {
+  inset: 0 auto auto 0;
+  border-radius: var(--control-radius);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 21%, transparent);
+}
+.main-region .dock-selection::after {
+  content: '';
+  position: absolute;
+  bottom: 3px;
+  left: calc(50% - 9px);
+  width: 18px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+:root[data-dock='auto-hide'] .main-region > .dock-wrap.dock-auto-hide {
+  height: 12px;
+  transform: none;
+  filter: none;
+}
+.main-region > .dock-wrap.dock-auto-hide .dock {
+  position: absolute;
+  inset: auto 0 0;
+  background: var(--surface-raised);
+  transition: transform 260ms var(--motion-ease);
+}
+.main-region > .dock-wrap.dock-auto-hide[data-revealed='false'] .dock { transform: translateY(calc(100% - 12px)); }
+.main-region > .dock-wrap.dock-auto-hide .dock-reveal-handle { top: 4px; pointer-events: none; }
+.main-region > .dock-wrap.dock-auto-hide[data-revealed='true'] .dock-reveal-handle { opacity: 0; }
+.main-region :is(.workspace-body, .library-scroll, .submissions-body, .settings-body) { padding-bottom: var(--workspace-inset); }
+:root .sidebar-footer { padding-bottom: 12px; }
+:root[data-text-size='18'] .sidebar-footer { padding-bottom: 12px; }
+.assistant-sidebar { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; padding: 3px; }
+.assistant-sidebar .codex-new-chat { justify-content: flex-start; gap: 10px; min-height: 36px; }
+.button.codex-new-chat {
+  color: var(--text-primary);
+  background: var(--surface-raised);
+  border-color: color-mix(in srgb, var(--text-secondary) 42%, var(--surface-raised));
+  box-shadow: none;
+}
+.button.codex-new-chat:hover:not(:disabled) { background: var(--accent-soft); border-color: var(--accent); }
+.assistant-sidebar-turns > .sidebar-section-label { margin: 0 0 5px; padding-inline: 10px; }
+.assistant-sidebar-turns .sidebar-link > svg { flex: none; }
+.assistant-sidebar-turns .sidebar-link > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.assistant-sidebar-turns .sidebar-link { text-align: left; }
+
+.sidebar-view { animation: workspace-sidebar-arrive 190ms var(--motion-ease) both; }
+@keyframes workspace-sidebar-arrive { from { opacity: .76; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.app-shell { transition: grid-template-columns 220ms var(--motion-ease); }
+.main-region { transition: margin-left 220ms var(--motion-ease); }
+.sidebar { min-width: 0; transition: opacity 160ms var(--motion-ease), transform 220ms var(--motion-ease), visibility 220ms; }
+:root[data-sidebar='collapsed'] .sidebar { display: flex; opacity: 0; visibility: hidden; transform: translateX(-5px); pointer-events: none; }
+.appearance-switch button,
+.folder-row,
+.reader-category-toggle,
+.segmented-control button {
+  transition: background-color var(--motion-control) var(--motion-ease), color var(--motion-control) var(--motion-ease), border-color var(--motion-control) var(--motion-ease);
+}
+.folder-expand > svg { transition: rotate 180ms var(--motion-ease); }
+.folder-expand[aria-expanded='true'] > svg { rotate: 90deg; }
+.reader-notes-panel, .paper-daily-list { animation: workspace-sidebar-arrive 190ms var(--motion-ease) both; }
+.capture-more[open] .capture-more-controls, .report-week-menu[data-state='open'] { animation: craft-menu-in 165ms var(--motion-ease) both; }
+:is(.select-content, .report-week-menu)[data-state='closed'] { animation: workbench-menu-close 100ms var(--motion-ease) both; }
+.report-bar-slot small { transition: bottom 270ms var(--motion-ease); }
+@keyframes workbench-menu-close { to { opacity: 0; translate: 0 2px; } }
+@supports selector(::details-content) {
+  :is(.paper-daily-text details, .arxiv-run-status details, .translation-failures, .today-collapsible, .report-statistics-rules)::details-content {
+    interpolate-size: allow-keywords;
+    block-size: 0;
+    opacity: 0;
+    overflow: clip;
+    transition: block-size 200ms var(--motion-ease), opacity 160ms ease, content-visibility 200ms allow-discrete;
+  }
+  :is(.paper-daily-text details, .arxiv-run-status details, .translation-failures, .today-collapsible, .report-statistics-rules)[open]::details-content { block-size: auto; opacity: 1; }
+}
+@media (max-width: 1200px) {
+  .main-region .dock .dock-item { gap: 5px; font-size: .8rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-shell, .main-region, .sidebar, .folder-expand > svg, .report-bar-slot small, .main-region > .dock-wrap.dock-auto-hide .dock { transition: none; }
+  .sidebar-view, .reader-notes-panel, .paper-daily-list, .capture-more[open] .capture-more-controls,
+  .report-week-menu[data-state], .select-content[data-state='closed'] { animation: none; }
+  :is(.paper-daily-text details, .arxiv-run-status details, .translation-failures, .today-collapsible, .report-statistics-rules)::details-content { transition: none; }
+}

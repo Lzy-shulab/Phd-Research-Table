@@ -1,0 +1,12 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["title", "projectId", "scheduledDate", "startTime", "endTime"],
+  "properties": {
+    "title": { "type": "string" },
+    "projectId": { "type": ["string", "null"] },
+    "scheduledDate": { "type": ["string", "null"] },
+    "startTime": { "type": ["string", "null"] },
+    "endTime": { "type": ["string", "null"] }
+  }
+}

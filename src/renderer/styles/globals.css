@@ -420,8 +420,7 @@ kbd {
 .planner-nav {
   display: grid;
   gap: 3px;
-  padding: 0 0 21px;
-  border-bottom: 1px solid var(--border);
+  padding: 0;
 }
 .sidebar-link {
   display: flex;

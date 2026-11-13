@@ -56,7 +56,7 @@ export function TaskInspector({ task }: { task: Task }) {
         >
           <X size={17} />
         </Button>
-        {task.seriesId && <div className="task-series-banner"><Repeat2 size={15} /><span><strong>每周重复安排</strong><small>当前编辑默认只影响本次；历史记录和后续安排不会静默改变。</small></span><Button disabled={syncingSeries} onClick={async () => { setSyncingSeries(true); await useWorkbench.getState().updateTaskSeries(task.seriesId!, task.occurrenceDate ?? task.scheduledDate ?? '', { title: task.title, projectId: task.projectId, priority: task.priority, estimatedMinutes: task.estimatedMinutes, checklist: task.checklist, milestone: task.milestone }); setSyncingSeries(false) }}>{syncingSeries ? '同步中…' : '同步本次及后续'}</Button></div>}
+        {task.seriesId && <div className="task-series-banner"><Repeat2 size={15} /><span><strong>每周重复安排</strong><small>仅修改本次安排。</small></span><Button disabled={syncingSeries} onClick={async () => { setSyncingSeries(true); await useWorkbench.getState().updateTaskSeries(task.seriesId!, task.occurrenceDate ?? task.scheduledDate ?? '', { title: task.title, projectId: task.projectId, priority: task.priority, estimatedMinutes: task.estimatedMinutes, checklist: task.checklist, milestone: task.milestone }); setSyncingSeries(false) }}>{syncingSeries ? '同步中…' : '同步本次及后续'}</Button></div>}
       </div>
       <div className="inspector-scroll">
         <Button
@@ -67,7 +67,7 @@ export function TaskInspector({ task }: { task: Task }) {
           onClick={() => void complete(task.id)}
         >
           {task.status === 'completed' ? <CheckCheck size={16} /> : <Circle size={16} />}
-          {task.status === 'completed' ? '已完成 · 点击恢复' : '标记完成'}
+          {task.status === 'completed' ? '已完成' : '标记完成'}
         </Button>
         <textarea
           className="inspector-title"

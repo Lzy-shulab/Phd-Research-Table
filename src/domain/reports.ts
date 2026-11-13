@@ -22,6 +22,13 @@ export function checkinAbsenceForDate(absences: CheckinAbsenceEntry[], date: str
   return absences.find(item => date >= item.startDate && date <= item.endDate)
 }
 const time = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, '请填写有效的开始和结束时间。')
+export const checkinStartSchema = z.object({ date: day, startTime: time, notes: z.string().max(1000), reminderEnabled: z.boolean() }).strict()
+export const isOpenCheckin = (entry: CheckinEntry) => Boolean(entry.startTime && !entry.endTime)
+export function checkinReminderAt(entry: CheckinEntry) {
+  if (!entry.reminderEnabled) return null
+  if (isOpenCheckin(entry)) return new Date(`${entry.date}T${entry.startTime}:00`).getTime() + 12 * 60 * 60_000
+  return checkinEndAt(entry)
+}
 export function checkinDuration(start: string, end: string, nextDay = false): number {
   if (!time.safeParse(start).success || !time.safeParse(end).success) return 0
   const minute = (value: string) => Number(value.slice(0, 2)) * 60 + Number(value.slice(3))
@@ -32,12 +39,24 @@ export function formatDuration(minutes: number): string {
   const hours = Math.floor(minutes / 60), remainder = minutes % 60
   return hours ? `${hours} 小时${remainder ? ` ${remainder} 分钟` : ''}` : `${remainder} 分钟`
 }
-export const checkinInputSchema = z.object({ date: day, startTime: time, endTime: time, endsNextDay: z.boolean().default(false), notes: z.string().max(1000) }).strict()
+export function suggestedCheckinEnd(start: string) {
+  if (!time.safeParse(start).success) return null
+  const minutes = Number(start.slice(0, 2)) * 60 + Number(start.slice(3)) + 720
+  return { endTime: `${String(Math.floor(minutes / 60) % 24).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`, endsNextDay: minutes >= 1440 }
+}
+export function checkinEndAt(entry: Pick<CheckinEntry, 'date' | 'endTime' | 'endsNextDay'>): number | null {
+  if (!isCalendarDate(entry.date) || !time.safeParse(entry.endTime).success) return null
+  const end = new Date(`${entry.date}T${entry.endTime}:00`)
+  if (entry.endsNextDay) end.setDate(end.getDate() + 1)
+  return end.getTime()
+}
+export const checkinInputSchema = z.object({ date: day, startTime: time, endTime: time, endsNextDay: z.boolean().default(false), notes: z.string().max(1000), reminderEnabled: z.boolean().optional() }).strict()
   .refine(item => checkinDuration(item.startTime, item.endTime, item.endsNextDay) > 0, { message: '结束时间须晚于开始时间，且时长不能超过 24 小时；跨午夜请勾选“结束于次日”。', path: ['endTime'] })
 // Existing duration-only records remain readable; no start time is invented for them.
-export const checkinListSchema = z.array(z.object({ date: day, durationMinutes: z.number().int().min(1).max(1440), notes: z.string().max(1000),
-  startTime: time.optional(), endTime: time.optional(), endsNextDay: z.boolean().optional(), id: z.string().uuid(), createdAt: z.iso.datetime() }).strict()
-  .refine(item => (!item.startTime && !item.endTime && !item.endsNextDay) || (!!item.startTime && !!item.endTime && checkinDuration(item.startTime, item.endTime, item.endsNextDay) === item.durationMinutes), '打卡时间段与时长不一致，原记录已保留。')).max(10000)
+export const checkinListSchema = z.array(z.object({ date: day, durationMinutes: z.number().int().min(0).max(1440), notes: z.string().max(1000),
+  startTime: time.optional(), endTime: time.optional(), endsNextDay: z.boolean().optional(), reminderEnabled: z.boolean().optional(), id: z.string().uuid(), createdAt: z.iso.datetime() }).strict()
+  .refine(item => item.durationMinutes === 0 ? isOpenCheckin(item) && !item.endsNextDay
+    : (!item.startTime && !item.endTime && !item.endsNextDay) || (!!item.startTime && !!item.endTime && checkinDuration(item.startTime, item.endTime, item.endsNextDay) === item.durationMinutes), '打卡时间段与时长不一致，原记录已保留。')).max(10000)
 export function checkinDayParts(item: CheckinEntry): { date: string; minutes: number }[] {
   if (!item.endsNextDay || !item.startTime) return [{ date: item.date, minutes: item.durationMinutes }]
   const first = 1440 - Number(item.startTime.slice(0, 2)) * 60 - Number(item.startTime.slice(3))

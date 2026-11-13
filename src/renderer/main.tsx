@@ -19,7 +19,16 @@ import './styles/workspace-rhythm.css'
 import './styles/experience.css'
 import './styles/glass-upgrade.css'
 import './styles/motion-craft.css'
+import './styles/workspace-motion.css'
 import { MotionConfig } from 'motion/react'
+import { useWorkbench } from './stores/workbench'
+import { useLibrary } from './stores/library'
+
+const entry = new URLSearchParams(location.search)
+if (entry.get('section') === 'literature' || entry.has('paper')) useWorkbench.setState({ section: 'literature' })
+else if (entry.get('section') === 'submissions') useWorkbench.setState({ section: 'submissions' })
+const entryPaper = entry.get('paper')
+if (entryPaper) useLibrary.getState().openPaper(entryPaper, entry.get('variant') === 'translated' ? 'translated' : 'source', undefined, undefined, true)
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

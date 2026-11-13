@@ -1,0 +1,36 @@
+# ImageGen prompts
+
+Built-in imagegen; selected concept references only.
+
+## Normal
+
+Use case: precise-object-edit
+Asset type: refined NORMAL-state desktop widget concept.
+Input image: edit target. Keep its exact information, six-row order, semantic colors, semi-transparent skeuomorphic glass character, current numbers and Chinese wording.
+Primary correction: the previous design feels fragmented because every row has its own rounded glass frame. REMOVE ALL INTERNAL SECTION FRAMES. The entire widget must read as ONE continuous sheet of gently frosted translucent glass with ONE outer beveled edge. Weather, clock, progress rings and today's time float directly on this same continuous background. No rounded row containers, no inset rectangles behind these four regions, no horizontal separator rules, no vertical divider between weekly and monthly, no double inner perimeter. Establish grouping using spacing, aligned typography and hierarchy alone.
+Keep the outer shell clearly physical glass: subtly rounded clear edge, narrow natural upper-left highlight, subtle lower-right thickness and gentle shadow. Reduce broad bright plastic-looking edge bands. Quiet blue/soft sage desktop wallpaper should visibly continue THROUGH the glass, softened enough to keep opaque dark text crisp. No sparkle, lens flare or strong neon glow.
+Actual outer panel width:height stays3:4, planned420x560 logicalpx, straight-on view, narrow wallpaper margin. Deliberately rebalance spacing so all six rows fit, with about18px inner margins.
+ROW1 exact "所在城市", a modest partly-cloudy icon, "多云 23°C", discreet ellipsis. On glass with NO container.
+ROW2 exact time "14:36", medium/semibold instead of very heavy black, and smaller "10月23日 周五". On glass with NO container.
+ROW3 two perfectly aligned columns, NO divider and NO card behind either. Left "本周", small blue ring80% with "80%" centered inside, beneath "48 / 60 小时". Right "本月", small green ring75% with "75%" inside, beneath "162 / 216 小时". Ring diameters about78 logicalpx, subtle glass rims only; preserve blue and green.
+ROW4 one simple typographic line, "今日" then "6小时30分 / 12小时", small outline pencil icon at far right. No inset strip, no border. Use a little extra breathing room around it.
+ROW5 two adjacent rectangular click targets, EACH16:9 width:height, about186x105 logicalpx,12px between. Left compact outline suitcase/airplane above "增加出差"; right compact cup/leaf icon above "增加休假". They are the only paired controls: indicate touchable surfaces with an extremely quiet translucent tonal lift and shallow bottom shadow, absolutely NO drawn bright outlines, thick frames or nested glass rims. Neither button should look like a separate card pasted onto the panel.
+ROW6 full-width understated glass action "心流模式", small focus-circle icon before it, about42px tall. Align its endpoints with the outside edges of both buttons in row5 combined. Use only subtle tonal lift to signal a button, NO thick luminous rectangular frame. Same continuous glass material.
+Constraints: all four informational rows entirely borderless. ZERO inner section outlines. Preserve all exact text and show all six rows. Do not omit controls. Keep ring percentages inside rings. Do not add names, slogans, instruction text, badges, subtitles, extra labels, or borders. Avoid unnecessary secondary labels and descriptions. Let the layout do the explaining.
+
+## Focus
+
+Use case: precise-object-edit
+Asset type: revised FOCUS-state desktop widget concept, with one useful optional focus activity.
+Input image1: previous horizontal focus widget, EDIT TARGET for composition. Input image2: updated borderless normal widget, MATERIAL REFERENCE and visual family.
+Make the focus widget match image2's simpler unified glass: one outer translucent physical glass silhouette, REMOVE the large inset rounded inner rectangle and remove ALL internal frames. A single continuous frosted blue-clear glass plane with softly beveled natural rim, narrow light highlight and subtle outer shadow. Background wallpaper visible gently through glass. Nothing is enclosed in its own card.
+Keep the already chosen COMPACT HORIZONTAL form, same width as normal widget. Approximate logical size420wide by220high. Show one single panel straight-on, with a modest blue desktop wallpaper margin. Full output landscape, all edges visible. No perspective.
+Content hierarchy, centered:
+1. Large current clock EXACT "14:36", dark charcoal opaque elegant semibold tabular numerals, about58logicalpx. Main visual anchor.
+2. Under it the elapsed focus duration EXACT "00:42:18", about30logicalpx, slightly lighter weight and dark blue-grey, with adequate breathing room from clock.
+3. At bottom center one quiet single line showing the optional focus activity EXACT "阅读论文" in about14logicalpx. A tiny restrained outline book icon before this text is okay, no enclosing badge. The activity is a user-editable example; DO NOT add any label such as '当前任务', '正在专注', '今日专注', or '心流模式'. Use no other text.
+The activity name gives meaning to the elapsed time without clutter. Keep it visually secondary; no distracting ornament or moving/looping decoration. No task progress, fake reward streak, goal countdown, performance score, weekly/monthly data, weather, date, quote, motivational slogan, breathing orb or timeline.
+This is the RESTING state: controls are hidden until pointer enters or keyboard focuses the panel. Do not draw pause, restart, exit or an ellipsis in this resting illustration. No new persistence behavior is implied: focus is only a standalone elapsed timer and never writes attendance records.
+Maintain material consistency with image2, dark readable text, one outer glass rim, no nested frames, no detached surfaces. Avoid unnecessary secondary labels and descriptions. Let the layout do the explaining.
+No comparison labels, annotations, arrows, captions or watermark. This is a polished plausible screenshot-like UI design, not a physical clock photographed on a desk.
+

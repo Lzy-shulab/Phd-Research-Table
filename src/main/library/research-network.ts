@@ -1,6 +1,7 @@
 import { session } from 'electron'
 import { setTimeout as delay } from 'node:timers/promises'
-const hosts = new Set(['arxiv.org', 'export.arxiv.org', 'api.crossref.org', 'sentences-bundle.hitokoto.cn'])
+const hosts = new Set(['arxiv.org', 'export.arxiv.org', 'api.crossref.org', 'huggingface.co', 'sentences-bundle.hitokoto.cn',
+  'openaccess.thecvf.com', 'aclanthology.org', 'proceedings.mlr.press', 'jmlr.org'])
 const arxivHosts = new Set(['arxiv.org', 'export.arxiv.org'])
 const directUntil = new Map<string, number>()
 let directSession: Promise<Electron.Session> | undefined

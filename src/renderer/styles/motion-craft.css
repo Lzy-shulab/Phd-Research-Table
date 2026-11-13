@@ -31,16 +31,22 @@
 .dialog-overlay[data-state='closed'] { animation: workspace-overlay-out var(--motion-depart) ease-in both; }
 .dialog-content[data-state='open'] { animation: craft-dialog-in 280ms var(--motion-ease) both; }
 .dialog-content[data-state='closed'] { animation: craft-dialog-out var(--motion-depart) ease-in both; }
+.dialog-content.reader-dialog.is-returning { animation:craft-dialog-out 140ms ease-in both; pointer-events:none; }
 .select-content { animation: craft-menu-in 180ms var(--motion-ease) both; }
 .toast { animation: none; }
+.app-shell { transform-origin:right center; }
+.workspace-spinner { display:inline-block; width:24px; height:24px; border:2px solid var(--border-default); border-top-color:var(--accent); border-radius:50%; animation:workspace-spin .8s linear infinite; }
+@keyframes workspace-spin { to { transform:rotate(360deg); } }
 @keyframes craft-check-in { from { opacity: .4; scale: .7; } to { opacity: 1; scale: 1; } }
 @keyframes craft-check-stroke { from { stroke-dashoffset: 24; } to { stroke-dashoffset: 0; } }
 @keyframes craft-dialog-in { from { opacity: 0; transform: translate(-50%, calc(-50% + 10px)) scale(.975); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
 @keyframes craft-dialog-out { from { opacity: 1; transform: translate(-50%, -50%) scale(1); } to { opacity: 0; transform: translate(-50%, calc(-50% + 4px)) scale(.99); } }
 @keyframes craft-menu-in { from { opacity: 0; translate: 0 -3px; } to { opacity: 1; translate: 0 0; } }
 @media (max-width: 1200px) { .dock-item { width: 116px; padding-inline: 8px; gap: 7px; } }
-:root[data-text-size='18'] .dock-item { width: 138px; }
+:root[data-text-size='18'] .dock-item { width: clamp(102px, 11.25vw, 138px); }
 @media (prefers-reduced-motion: reduce) {
+  .dialog-content.reader-dialog.is-returning { animation:workspace-overlay-out 80ms linear both; }
+  .workspace-spinner { animation:none; }
   .workspace-glyph, .dock-wrap { transition: none; }
   .dock-item.selected .workspace-glyph, .dock-item:hover:not(.selected) .workspace-glyph, .dock-item:active .workspace-glyph { transform: none; }
   .button:active:not(:disabled), .task-checkbox:active { scale: 1; translate: none; }

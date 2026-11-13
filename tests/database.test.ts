@@ -54,11 +54,12 @@ describe('SQLite persistence and domain invariants', () => {
     const upgradedTasks = upgraded.sqlite.prepare('SELECT * FROM tasks ORDER BY id').all() as Record<string, unknown>[]
     expect(upgradedTasks).toHaveLength(before.tasks.length)
     for (const [index, row] of (before.tasks as Record<string, unknown>[]).entries()) expect(upgradedTasks[index]).toMatchObject(row)
+    expect(upgradedTasks.map(task => task.reminder_minutes)).toEqual([null, null])
     expect(upgraded.sqlite.prepare('SELECT * FROM projects').all()).toEqual(before.projects)
     expect(upgraded.sqlite.prepare('SELECT * FROM app_settings').all()).toEqual(before.settings)
     expect(upgraded.sqlite.prepare('SELECT * FROM library_folders').all()).toEqual([])
     expect(upgraded.sqlite.prepare('SELECT * FROM papers').all()).toEqual([])
-    expect(upgraded.sqlite.prepare('SELECT * FROM __drizzle_migrations').all()).toHaveLength(8)
+    expect(upgraded.sqlite.prepare('SELECT count(*) AS total FROM __drizzle_migrations').get()).toEqual({ total: 9 })
     expect(upgraded.sqlite.pragma('integrity_check', { simple: true })).toBe('ok')
     expect(upgraded.sqlite.pragma('foreign_key_check')).toEqual([])
     upgraded.close()

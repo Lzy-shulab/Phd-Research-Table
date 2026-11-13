@@ -30,7 +30,7 @@
 .reader-dialog .reader-category-toggle > svg { color: var(--text-secondary); transition: transform 180ms cubic-bezier(.16, 1, .3, 1); }
 .reader-dialog .reader-category-toggle[aria-expanded='true'] > svg { transform: rotate(180deg); }
 .reader-dialog .reader-category-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-.reader-dialog .reader-annotation-group .reader-annotation-list { padding: 10px 0 8px; animation: reader-annotation-reveal 170ms ease-out; }
+.reader-dialog .reader-annotation-group .reader-annotation-list { padding: 10px 0 8px; }
 .reader-dialog .reader-annotation { background: transparent; border-radius: 8px; border: 0; }
 .reader-dialog .reader-annotation + .reader-annotation { border-top: 1px solid var(--border-default); padding-top: 3px; }
 .reader-dialog .reader-annotation.is-active { background: var(--surface-inset); }
@@ -48,9 +48,12 @@
   animation: none;
 }
 .reader-dialog .pdf-page[data-rendered='false'] .pdf-highlight-layer { visibility: hidden; }
+.reader-dialog .reader-scroll { overflow-anchor: none; }
+.reader-dialog .reader-hand .pdf-page :is(canvas, .textLayer, .textLayer span) { cursor: grab; user-select: none; }
+.reader-dialog .reader-panning,
+.reader-dialog .reader-panning .pdf-page :is(canvas, .textLayer, .textLayer span) { cursor: grabbing; user-select: none; }
+.reader-dialog .reader-toolbar button[aria-pressed='true'] { background: var(--accent-soft); color: var(--text-primary); }
 
-@keyframes reader-annotation-reveal { from { opacity: .55; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
   .reader-dialog .reader-category-toggle > svg { transition: none; }
-  .reader-dialog .reader-annotation-group .reader-annotation-list { animation: none; }
 }

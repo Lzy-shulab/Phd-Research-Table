@@ -7,7 +7,9 @@ import { interfacePalette } from '../shared/palette'
 export function createWindow(
   settings: () => SettingsRepository | undefined,
   rendererUrl: string | undefined,
-  isBusy: () => boolean = () => false
+  isBusy: () => boolean = () => false,
+  initialSection?: 'submissions' | 'literature',
+  initialPaper?: { id: string; variant: 'source' | 'translated' }
 ): BrowserWindow {
   const saved = settings()?.getWindowState()
   const visible =
@@ -67,8 +69,15 @@ export function createWindow(
   window.webContents.on('will-attach-webview', (event) => event.preventDefault())
   window.once('ready-to-show', () => {
     if (saved?.maximized) window.maximize()
-    window.show()
   })
+  let presented = false
+  const rendererReady = (event: Electron.IpcMainEvent) => {
+    if (event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame || presented) return
+    presented = true
+    window.show(); window.focus()
+    window.webContents.send('workbench:shown')
+  }
+  ipcMain.on('workbench:ready', rendererReady)
   let allowClose = false
   let pendingToken: string | undefined
   let closeTimer: ReturnType<typeof setTimeout> | undefined
@@ -129,8 +138,10 @@ export function createWindow(
   window.once('closed', () => {
     clearTimeout(closeTimer)
     ipcMain.removeListener('app:flush-result', flushResult)
+    ipcMain.removeListener('workbench:ready', rendererReady)
   })
-  if (rendererUrl) void window.loadURL(rendererUrl)
-  else void window.loadFile(join(import.meta.dirname, '../renderer/index.html'))
+  const query: Record<string, string> = { ...(initialSection ? { section: initialSection } : {}), ...(initialPaper ? { paper: initialPaper.id, variant: initialPaper.variant } : {}) }
+  if (rendererUrl) { const url = new URL(rendererUrl); for (const [key, value] of Object.entries(query)) url.searchParams.set(key, value); void window.loadURL(url.href) }
+  else void window.loadFile(join(import.meta.dirname, '../renderer/index.html'), { query })
   return window
 }

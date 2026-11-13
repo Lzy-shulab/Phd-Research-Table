@@ -40,7 +40,6 @@ export function MiniCalendar({ value, onSelect }: { value?: string; onSelect?: (
           </Button>
         </div>
       </div>
-      {!onSelect && <p className="mini-calendar-hint">选日期，在日历中查看当天安排</p>}
       <div className="mini-calendar-grid">
         {['一', '二', '三', '四', '五', '六', '日'].map((day, i) => (
           <span key={i} className="weekday">

@@ -21,7 +21,7 @@ export function PaperDialog({ paper, onClose }: { paper: Paper; onClose: () => v
   useEffect(() => { if (dirty) writeDraft(draftKey, draft) }, [draft, draftKey, dirty])
   const requestClose = () => { if (dirty) setConfirmClose(true); else onClose() }
   return <>
-    <Dialog open title="文献信息" description="补充文献信息、调整文件夹，或记录阅读笔记。" onOpenChange={(open) => { if (!open && !busy) requestClose() }}>
+    <Dialog open title="文献信息"  onOpenChange={(open) => { if (!open && !busy) requestClose() }}>
       <form className="project-form" onSubmit={async (event) => {
         event.preventDefault(); if (busy || !draft.title.trim()) return; setBusy(true)
         const result = await libraryAction(window.workbench.updatePaper(paper.id, { ...draft, tags: draft.tags.split(/[，,]/).map((item) => item.trim()).filter(Boolean) }))

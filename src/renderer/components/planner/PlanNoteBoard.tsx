@@ -48,9 +48,6 @@ export function PlanNoteBoard({
       <div className="note-board-empty">
         <FolderPlus size={28} strokeWidth={1.3} />
         <h2>{filtered ? '没有匹配的任务' : '这里还没有任务'}</h2>
-        <p>
-          {filtered ? '换一个关键词，或调整任务状态。' : '创建项目后，就可以安排任务。'}
-        </p>
         {!filtered && (
           <Button onClick={onNewProject}>
             <Plus size={15} />

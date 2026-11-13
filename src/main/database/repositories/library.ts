@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, ne, sql } from 'drizzle-orm'
 import { DomainError } from '../../../domain/errors'
 import type { FolderInput, Paper, PaperPatch, PaperCollection } from '../../../shared/types'
 import type { WorkbenchDatabase } from '../db'
@@ -143,6 +143,6 @@ export class LibraryRepository {
     return this.db.select().from(appSettings).where(eq(appSettings.key, key)).get()?.value ?? fallback
   }
   setSetting(key: string, value: string) {
-    this.db.insert(appSettings).values({ key, value }).onConflictDoUpdate({ target: appSettings.key, set: { value } }).run()
+    this.db.insert(appSettings).values({ key, value }).onConflictDoUpdate({ target: appSettings.key, set: { value }, setWhere: ne(appSettings.value, value) }).run()
   }
 }

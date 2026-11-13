@@ -13,6 +13,7 @@ const task = (id: string, patch: Partial<Task> = {}): Task => ({
   scheduledDate: null,
   startTime: null,
   endTime: null,
+  reminderMinutes: null,
   dueDate: null,
   estimatedMinutes: null,
   deferredUntil: null,

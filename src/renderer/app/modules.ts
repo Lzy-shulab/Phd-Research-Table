@@ -1,4 +1,4 @@
-import { CalendarDays, BookOpenText, Award, Sun, CalendarCheck2, ListTodo, SlidersHorizontal, Send, ChartNoAxesCombined } from 'lucide-react'
+import { CalendarDays, BookOpenText, Award, Sun, CalendarCheck2, ListTodo, SlidersHorizontal, Send, ChartNoAxesCombined, Bot } from 'lucide-react'
 import type { Section, PlannerView } from '../../shared/types'
 export const modules = [
   { id: 'planner', label: '研究计划', icon: CalendarCheck2, description: '安排今天真正要推进的研究。' },
@@ -6,6 +6,7 @@ export const modules = [
   { id: 'outputs', label: '科研成果', icon: Award, description: '记录已发表的论文与成果。' },
   { id: 'submissions', label: '论文投稿', icon: Send, description: '记录投稿进展与返修期限。' },
   { id: 'reports', label: '研究报表', icon: ChartNoAxesCombined, description: '回顾阅读、任务、成果与津贴。' },
+  { id: 'codex', label: '研究助手', icon: Bot, description: '通过对话读取和操作科研工作台。' },
   { id: 'settings', label: '设置', icon: SlidersHorizontal, description: '管理文件保存位置。' }
 ] satisfies { id: Section; label: string; icon: typeof CalendarDays; description: string }[]
 export const plannerViews = [

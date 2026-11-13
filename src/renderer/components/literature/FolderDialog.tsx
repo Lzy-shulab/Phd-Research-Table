@@ -40,7 +40,7 @@ export function FolderDialog({ folder, parentId = null, onClose }: {
   }
   return <>
     <Dialog open onOpenChange={(open) => { if (!open && !busy) onClose() }}
-      title={folder ? '管理文件夹' : parent ? '新建子文件夹' : '新建文献文件夹'} description="支持顶层、二级和三级文件夹，按期刊、会议或阅读主题整理文献。">
+      title={folder ? '管理文件夹' : parent ? '新建子文件夹' : '新建文献文件夹'} >
       <form className="project-form" onSubmit={async (event) => {
         event.preventDefault()
         if (busy || !name.trim()) return
@@ -55,7 +55,7 @@ export function FolderDialog({ folder, parentId = null, onClose }: {
           <option value="">顶层文件夹</option>
           {parentOptions.map((item) => <option key={item.id} value={item.id}>{pathOf(item)}</option>)}
         </select></label>
-        <p className="field-hint">当前最多三级；第三层文件夹不能再建立下级。</p>
+        
         <div className="dialog-actions">
           {folder && <Button variant="ghost" className="danger-text push-right" disabled={busy} onClick={() => setRemove(true)}><Trash2 size={15} />删除文件夹</Button>}
           <Button onClick={onClose} disabled={busy}>取消</Button>

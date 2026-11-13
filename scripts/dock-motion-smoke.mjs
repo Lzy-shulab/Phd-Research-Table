@@ -11,6 +11,7 @@ const env = {
   ...process.env,
   WORKBENCH_DATA_DIR: profile,
   WORKBENCH_DISABLE_ARXIV_AUTO: '1',
+  WORKBENCH_DISABLE_WIDGET_AUTO: '1',
   WORKBENCH_DISABLE_METADATA_AUTO: '1',
   WORKBENCH_DISABLE_ENCOURAGEMENT_AUTO: '1',
   WORKBENCH_DISABLE_NOTIFICATIONS: '1'
@@ -25,7 +26,7 @@ try {
     const win = BrowserWindow.getAllWindows()[0]
     win.setContentSize(1440, 860)
     win.webContents.setBackgroundThrottling(false)
-    win.showInactive()
+    win.hide()
   })
   await page.getByRole('heading', { name: '今日计划', exact: true }).waitFor()
   assert.equal(await page.locator('html').getAttribute('data-dock'), 'pinned')
@@ -39,41 +40,40 @@ try {
   const hidden = await page.evaluate(() => {
     const wrap = document.querySelector('.dock-wrap')
     const dock = document.querySelector('.dock')
-    if (!(wrap instanceof HTMLElement) || !(dock instanceof HTMLElement)) throw Error('Dock missing')
+    const panel = document.querySelector('.main-region')
+    if (!(wrap instanceof HTMLElement) || !(dock instanceof HTMLElement) || wrap.parentElement !== panel) throw Error('Dock missing from workspace frame')
     const rect = wrap.getBoundingClientRect()
-    const before = getComputedStyle(wrap, '::before')
+    const dockRect = dock.getBoundingClientRect()
     return {
       top: rect.top,
       bottom: rect.bottom,
-      viewportHeight: innerHeight,
-      clipPath: before.clipPath,
-      silhouette: before.content,
+      centerX: rect.left + rect.width / 2,
+      panelBottom: panel.getBoundingClientRect().bottom,
+      dockTop: dockRect.top,
       radius: parseFloat(getComputedStyle(dock).borderRadius),
-      transitionDuration: getComputedStyle(wrap).transitionDuration,
-      dockHeight: dock.getBoundingClientRect().height
+      transitionDuration: getComputedStyle(dock).transitionDuration,
+      dockHeight: dockRect.height
     }
   })
-  assert.ok(hidden.top >= hidden.viewportHeight - 13, JSON.stringify(hidden))
-  assert.ok(hidden.bottom > hidden.viewportHeight, JSON.stringify(hidden))
-  assert.equal(hidden.clipPath, 'none', JSON.stringify(hidden))
-  assert.equal(hidden.silhouette, 'none', JSON.stringify(hidden))
-  assert.ok(hidden.radius > 100, JSON.stringify(hidden))
+  assert.ok(Math.abs(hidden.bottom - hidden.panelBottom) <= 2, JSON.stringify(hidden))
+  assert.ok(hidden.panelBottom - hidden.dockTop <= 14, JSON.stringify(hidden))
+  assert.equal(hidden.radius, 0)
   assert.notEqual(hidden.transitionDuration, '0s')
   await page.screenshot({ path: join(evidence, 'dock-hidden.png'), animations: 'disabled', scale: 'css' })
 
-  await page.mouse.move(720, 859)
+  await page.mouse.move(hidden.centerX, hidden.bottom - 5)
   await page.waitForFunction(() => document.querySelector('.dock-wrap')?.getAttribute('data-revealed') === 'true')
   await page.waitForTimeout(420)
-  const shown = await page.locator('.dock-wrap').evaluate((element) => {
+  const shown = await page.locator('.dock').evaluate((element) => {
     const rect = element.getBoundingClientRect()
-    return { top: rect.top, bottom: rect.bottom, viewportHeight: innerHeight }
+    return { top: rect.top, bottom: rect.bottom }
   })
-  assert.ok(shown.top < shown.viewportHeight - hidden.dockHeight, JSON.stringify(shown))
-  assert.ok(Math.abs(shown.bottom - shown.viewportHeight) <= 1, JSON.stringify(shown))
+  assert.ok(Math.abs(shown.top - (hidden.bottom - hidden.dockHeight)) <= 2, JSON.stringify(shown))
+  assert.ok(Math.abs(shown.bottom - hidden.bottom) <= 2, JSON.stringify(shown))
   await page.screenshot({ path: join(evidence, 'dock-revealed.png'), animations: 'disabled', scale: 'css' })
 
   // Leaving sideways along the bottom edge must hide just like leaving upward.
-  await page.mouse.move(20, 859)
+  await page.mouse.move(20, hidden.bottom - 5)
   await page.waitForFunction(() => document.querySelector('.dock-wrap')?.getAttribute('data-revealed') === 'false')
   await page.reload()
   await page.getByRole('heading', { name: '今日计划', exact: true }).waitFor()
@@ -81,8 +81,8 @@ try {
   await page.locator('.dock-item').first().focus()
   await page.waitForFunction(() => document.querySelector('.dock-wrap')?.getAttribute('data-revealed') === 'true')
   await page.keyboard.press('Tab')
-  await page.mouse.move(720, 859)
-  await page.mouse.move(20, 859)
+  await page.mouse.move(hidden.centerX, hidden.bottom - 5)
+  await page.mouse.move(20, hidden.bottom - 5)
   await page.waitForTimeout(350)
   assert.equal(await page.locator('.dock-wrap').getAttribute('data-revealed'), 'true', 'Keyboard focus keeps Dock available after pointer leaves')
   await page.evaluate(async () => {
@@ -102,18 +102,18 @@ try {
   assert.ok(compact.scrollWidth <= compact.width + 1, JSON.stringify(compact))
   await page.screenshot({ path: join(evidence, 'dock-minimum-dark.png'), animations: 'disabled', scale: 'css' })
   await page.emulateMedia({ reducedMotion: 'reduce' })
-  const reducedDuration = await page.locator('.dock-wrap').evaluate((element) => Number.parseFloat(getComputedStyle(element).transitionDuration))
+  const reducedDuration = await page.locator('.dock').evaluate((element) => Number.parseFloat(getComputedStyle(element).transitionDuration))
   assert.ok(reducedDuration <= 0.001, String(reducedDuration))
   assert.deepEqual(errors, [])
   const result = {
-    checks: ['floating-capsule-shape', 'auto-hide-setting', 'bottom-edge-reveal', 'delayed-hide', 'restart-persistence', 'keyboard-focus-reveal', 'minimum-dark-layout', 'reduced-motion'],
+    checks: ['integrated-workspace-footer', 'auto-hide-setting', 'workspace-edge-reveal', 'delayed-hide', 'restart-persistence', 'keyboard-focus-reveal', 'minimum-dark-layout', 'reduced-motion'],
     hidden,
     shown,
     compact,
     errors
   }
   writeFileSync(join(evidence, 'result.json'), JSON.stringify(result, null, 2))
-  console.log('PASS floating Dock capsule, auto-hide reveal, persistence and keyboard access')
+  console.log('PASS integrated Dock, auto-hide reveal, persistence and keyboard access')
 } finally {
   await app.close()
 }

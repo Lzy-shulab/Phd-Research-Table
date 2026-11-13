@@ -58,15 +58,12 @@ export function OutputsWorkspace() {
     <main className="literature-workspace outputs-workspace">
       <header className="workspace-header library-header">
         <div>
-          <div className="workspace-breadcrumb">
-            科研成果<span>/</span>
-            {outputYear === 'all' ? '我的发表' : `${outputYear} 年`}
-          </div>
+          
           <div className="heading-line">
             <h1>科研成果</h1>
             <span className="library-count">{publications.length} 篇</span>
           </div>
-          <p>把每一段完成的研究，收入自己的书架。</p>
+          
         </div>
         <Button variant="primary" onClick={() => setEditing('new')}>
           <Plus size={17} />
@@ -132,11 +129,7 @@ export function OutputsWorkspace() {
               <FileText size={46} strokeWidth={1} />
             </div>
             <h2>{publications.length ? '没有符合条件的成果' : '让发表的成果，有自己的位置'}</h2>
-            <p>
-              {publications.length
-                ? '调整左侧年份、期刊或搜索条件。'
-                : '上传论文 PDF，自动识别文章资料，核对后保存。'}
-            </p>
+            
             {publications.length ? (
               <Button
                 onClick={() => {

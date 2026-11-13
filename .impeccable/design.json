@@ -3,6 +3,96 @@
   "generatedAt": "2026-10-05T17:38:00.994Z",
   "title": "Design System: PhD 科研工作台 v0.8.19",
   "extensions": {
+    "desktopWidget": {
+      "scope": "Desktop widget only; preserves main application defaults and existing component snippets.",
+      "document": "DESIGN-desktop-widget.md",
+      "version": "0.8.32",
+      "sources": [
+        "src/renderer/widget/redesign.css",
+        "src/renderer/widget/rail.css",
+        "src/renderer/widget/PanelFrame.tsx",
+        "src/renderer/widget/ProgressRing.tsx",
+        "src/renderer/widget/ReadingPanel.tsx",
+        "src/domain/widget.ts",
+        "src/shared/widget.ts"
+      ],
+      "colors": {
+        "ink": "#f5f3ee",
+        "inkSecondary": "#c2beb5",
+        "accent": "#dfc58e",
+        "weekRing": "#e3c389",
+        "monthRing": "#a1c9b9",
+        "edge": "#ffffff26"
+      },
+      "material": {
+        "background": "rgb(39 39 39 / calc(.56 + var(--glass-opacity,.62) * .30))",
+        "savedOpacityDefault": 0.62,
+        "savedOpacityRange": [
+          0.35,
+          0.9
+        ],
+        "backdropFilter": "blur(24px) saturate(1.1)",
+        "nativeBackdrop": "acrylic",
+        "shadow": "none",
+        "textOpacity": 1,
+        "outerMargin": 0,
+        "nativeRegion": "Rounded window region matches the panel",
+        "fallback": {
+          "background": "#272727",
+          "backdropFilter": "none"
+        }
+      },
+      "typography": {
+        "fontFamily": "'Manrope Variable', 'Microsoft YaHei UI', sans-serif",
+        "base": "16px / 24px",
+        "title": "20px / 28px",
+        "secondary": "14px / 20px",
+        "clock": "60px / 60px",
+        "ringValue": "30px / 36px",
+        "icons": "Phosphor"
+      },
+      "geometry": {
+        "normalSize": [
+          480,
+          720
+        ],
+        "outerMargin": "0px",
+        "shellRadius": "16px",
+        "fieldRadius": "12px",
+        "scaleRange": [
+          0.6,
+          1
+        ],
+        "automaticScale": 1,
+        "ringDiameter": "144px",
+        "ringStrokeWidth": "7px",
+        "sheetPadding": "24px"
+      },
+      "interaction": {
+        "curve": "cubic-bezier(.22,1,.36,1)",
+        "entrance": "500ms / 24px",
+        "collapse": "200ms / 16px",
+        "hover": "300ms",
+        "pressScale": 0.98,
+        "ring": "500ms, driven by real values",
+        "reducedMotion": "No displacement; shortened opacity only",
+        "idle": "10 minutes, preserving active editors and focus sessions",
+        "navigation": "Window-local overlays with focus management; no top-layer offset"
+      },
+      "attendance": {
+        "week": "Monday through Sunday inclusive, including days in adjacent months. The progress ring and daily rows share the same reportRange result.",
+        "segments": "Show multiple segments per day, sorted by start time.",
+        "crossMidnight": "Split at midnight and show each day's portion with 24:00 / 00:00 boundaries.",
+        "absence": "Keep recorded segments and duration visible; tag absence records as excluded from cumulative total.",
+        "legacyDurationOnly": "Show 未记录起止时间; do not infer times.",
+        "empty": "Absence label, 未打卡 for past or current dates, — for future dates."
+      },
+      "reading": {
+        "import": "Rail and panel accept local PDFs; save to shared library, queue with configured translator",
+        "progress": "Engine events only; unknown percentage stays unknown",
+        "navigation": "Shared folders; opens the selected PDF or bilingual variant in workbench"
+      }
+    },
     "scope": "Wallpaper-led glass shell, clear reading surfaces, semantic auxiliary actions and one geometric research-notes style.",
     "sources": [
       "src/shared/palette.ts",

@@ -1,0 +1,10 @@
+import React, { Suspense } from 'react'
+import ReactDOM from 'react-dom/client'
+import './widget.css'
+import './desktop.css'
+import '@fontsource-variable/manrope'
+import './redesign.css'
+import './theme.css'
+import './desktop-motion.css'
+import { Panel } from './WidgetRouter'
+ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><Suspense fallback={<div className="desktop-panel desktop-loading" role="status" aria-label="加载面板"><span className="desktop-spinner"/></div>}><Panel /></Suspense></React.StrictMode>)

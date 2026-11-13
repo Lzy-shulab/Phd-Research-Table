@@ -28,6 +28,7 @@ export const tasks = sqliteTable(
     scheduledDate: text('scheduled_date'),
     startTime: text('start_time'),
     endTime: text('end_time'),
+    reminderMinutes: integer('reminder_minutes'),
     estimatedMinutes: integer('estimated_minutes'),
     deferredUntil: text('deferred_until'),
     seriesId: text('series_id'),

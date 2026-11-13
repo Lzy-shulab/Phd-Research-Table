@@ -1,4 +1,13 @@
-export const translationProviders = ['siliconflowfree', 'gemini', 'siliconflow', 'openai-compatible'] as const
+export const translationProviders = ['siliconflowfree', 'gemini', 'siliconflow', 'openai-compatible', 'codex-cli'] as const
+export const codexReasoningEfforts = ['default', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra'] as const
+export type CodexReasoningEffort = (typeof codexReasoningEfforts)[number]
+export interface CodexTranslationStatus {
+  installed: boolean
+  loggedIn: boolean
+  executable: string
+  message: string
+  models: { id: string; name: string; efforts: string[] }[]
+}
 export function isHybridQwen3(model: string) {
   return /^(?:Pro\/)?Qwen\/Qwen3-(?:0\.6|1\.7|4|8|14|32|30|235)B(?:-A(?:3|22)B)?$/i.test(model)
 }
@@ -15,6 +24,7 @@ export interface TranslationApiProfile {
   hasApiKey: boolean
   ready: boolean
   note: string
+  reasoningEffort?: CodexReasoningEffort
 }
 
 export interface TranslationProfileInput {
@@ -25,6 +35,7 @@ export interface TranslationProfileInput {
   baseUrl: string
   apiKey?: string
   clearApiKey?: boolean
+  reasoningEffort?: CodexReasoningEffort
 }
 
 export interface TranslationProfilesSnapshot {
@@ -40,13 +51,15 @@ export interface TranslationRuntimeProfile {
   model: string
   baseUrl: string
   apiKey: string
+  reasoningEffort?: CodexReasoningEffort
 }
 
 export const translationProviderLabels: Record<TranslationProvider, string> = {
   siliconflowfree: 'PDF2zh 公益免费服务',
   gemini: 'Google Gemini',
   siliconflow: 'SiliconFlow',
-  'openai-compatible': 'OpenAI 兼容接口'
+  'openai-compatible': 'OpenAI 兼容接口',
+  'codex-cli': '本地 Codex CLI'
 }
 
 export const siliconFlowTranslationModel = 'Qwen/Qwen3-8B'
@@ -54,6 +67,11 @@ export const siliconFlowTranslationBaseUrl = 'https://api.siliconflow.cn/v1'
 export const defaultTranslationActiveId = 'siliconflow-api'
 
 export const defaultTranslationProfiles: TranslationApiProfile[] = [
+  {
+    id: 'codex-cli', name: '本地 Codex CLI', provider: 'codex-cli', model: '', baseUrl: '',
+    builtIn: true, hasApiKey: false, ready: true, reasoningEffort: 'default',
+    note: '使用本机 Codex 的登录账号与额度，无需另填模型 API 密钥。PDF2zh 处理排版并生成中英对照 PDF。'
+  },
   {
     id: 'pdf2zh-free',
     name: 'PDF2zh 公益免费服务',
@@ -101,5 +119,5 @@ export const defaultTranslationProfiles: TranslationApiProfile[] = [
 ]
 
 export function translationProfileRequiresKey(provider: TranslationProvider) {
-  return provider !== 'siliconflowfree'
+  return provider !== 'siliconflowfree' && provider !== 'codex-cli'
 }

@@ -41,7 +41,7 @@ describe('Research workspace upgrade', () => {
       expect(new LibraryRepository(upgraded.db).papers()[0]?.honors).toEqual([])
       expect(upgraded.sqlite.prepare('SELECT * FROM submissions').all()).toEqual([])
       expect(upgraded.sqlite.prepare('SELECT * FROM submission_stages').all()).toEqual([])
-      expect(upgraded.sqlite.prepare('SELECT * FROM __drizzle_migrations').all()).toHaveLength(8)
+      expect(upgraded.sqlite.prepare('SELECT count(*) AS total FROM __drizzle_migrations').get()).toEqual({ total: 9 })
     } finally { upgraded.close(); rmSync(directory, { recursive: true, force: true }) }
   })
   it('backfills legacy submission events into editable custom stages without changing old rows', () => {

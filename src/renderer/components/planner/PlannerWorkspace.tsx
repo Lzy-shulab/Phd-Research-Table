@@ -83,16 +83,6 @@ export function PlannerWorkspace() {
   const dueSoonCount = tasks.filter((task) => task.status !== 'completed' && !!task.dueDate && task.dueDate >= today && task.dueDate <= nextWeek).length
   const anytime = todayScheduled.filter((task) => !task.startTime)
   const scheduled = todayScheduled.filter((task) => !!task.startTime)
-  const subtitle =
-    view === 'today'
-      ? formatDate(now)
-      : view === 'upcoming'
-        ? '安排接下来要推进的研究。'
-        : view === 'calendar'
-          ? '在同一日历中查看和安排所有项目的研究任务。'
-          : view === 'completed'
-            ? '回顾已经完成的研究工作。'
-            : '待推进与已完成，都留在这里。'
   const defaults = {
     scheduledDate: view === 'today' ? today : view === 'calendar' ? calendarDate : null,
     projectId: null
@@ -112,14 +102,11 @@ export function PlannerWorkspace() {
     <main className="planner-workspace">
       <header className="workspace-header">
         <div>
-          <div className="workspace-breadcrumb">
-            研究计划<span>/</span>
-            {title}
-          </div>
+          
           <div className="heading-line">
             <h1>{title}</h1>
           </div>
-          <p>{subtitle}</p>
+          {view === 'today' && <p>{formatDate(now)}</p>}
         </div>
       </header>
       <div className="workspace-body">
@@ -148,7 +135,7 @@ export function PlannerWorkspace() {
         />
         {view === 'today' && overdue.length > 0 && (
           <section className="overdue-panel" aria-labelledby="overdue-heading">
-            <div className="overdue-heading"><div><CalendarClock size={17} /><h2 id="overdue-heading">逾期待处理</h2><span>{overdue.length}</span></div><p>完成、重新安排，或暂缓到明天。</p></div>
+            <div className="overdue-heading"><div><CalendarClock size={17} /><h2 id="overdue-heading">逾期待处理</h2><span>{overdue.length}</span></div></div>
             <div className="overdue-list">
               {overdue.map((task) => <article key={task.id} className="overdue-row">
                 <button className="overdue-title" onClick={() => useWorkbench.getState().selectTask(task.id)}><strong>{task.title}</strong><span>{task.scheduledDate && `原计划 ${calendarLabel(task.scheduledDate)}`}{task.scheduledDate && task.dueDate ? ' · ' : ''}{task.dueDate && `截止 ${calendarLabel(task.dueDate)}`}</span></button>
@@ -236,7 +223,6 @@ export function PlannerWorkspace() {
                   <div className="empty-state today-empty">
                     <div className="empty-icon"><Sun size={25} strokeWidth={1.3} /></div>
                     <h2>{query ? '没有匹配的今日任务。' : '今天还没有安排研究任务。'}</h2>
-                    <p>{query ? '换一个关键词，或清空筛选。' : '先记下一件要做的事，或从全部任务中安排到今天。'}</p>
                     <div className="today-empty-actions">
                       {query ? <Button onClick={() => setQuery('')}>清除搜索</Button> : <>
                         <Button variant="primary" onClick={focusCapture}><Plus size={15} />添加今日任务</Button>
@@ -247,13 +233,13 @@ export function PlannerWorkspace() {
                 )}
                 {todayLayout === 'list' && todayScheduled.length > 0 && (
                   <section className="task-section today-task-section">
-                    <div className="section-heading"><h2>今天要做 <span>{todayScheduled.length}</span></h2><span>按时间查看具体行动</span></div>
+                    <div className="section-heading"><h2>今天要做 <span>{todayScheduled.length}</span></h2></div>
                     <TaskList tasks={todayScheduled} />
                   </section>
                 )}
                 {todayLayout === 'schedule' && todayScheduled.length > 0 && <>
                   {anytime.length > 0 && <section className="task-section today-task-section"><div className="section-heading"><h2>未指定时间 <span>{anytime.length}</span></h2></div><TaskList tasks={anytime} /></section>}
-                  {scheduled.length > 0 && <section className="task-section today-task-section"><div className="section-heading"><h2>时间安排 <span>{scheduled.length}</span></h2><span className="mono">本地时间 · 24小时制</span></div><ScheduleGrid dates={[now]} tasks={scheduled} compact /></section>}
+                  {scheduled.length > 0 && <section className="task-section today-task-section"><div className="section-heading"><h2>时间安排 <span>{scheduled.length}</span></h2></div><ScheduleGrid dates={[now]} tasks={scheduled} compact /></section>}
                 </>}
                 {todayDueOnly.length > 0 && <section className="task-section today-task-section"><div className="section-heading"><h2>今天截止，尚未安排到今天 <span>{todayDueOnly.length}</span></h2></div><TaskList tasks={todayDueOnly} showDate /></section>}
                 {todayCompleted.length > 0 && <details className="today-collapsible"><summary>已完成 <strong>{todayCompleted.length}</strong></summary><TaskList tasks={todayCompleted} showDate /></details>}
@@ -279,15 +265,6 @@ export function PlannerWorkspace() {
                   <EmptyIcon size={25} strokeWidth={1.3} />
                 </div>
                 <h2>{emptyTitle}</h2>
-                <p>
-                  {query
-                    ? '换一个关键词，或清空筛选。'
-                    : view === 'completed'
-                      ? '已完成的任务仍可查看或恢复。'
-                      : view === 'upcoming'
-                        ? '为接下来的研究安排一个时间。'
-                        : '记录一个研究想法、任务或待办事项。'}
-                </p>
                 {query && <Button onClick={() => setQuery('')}>清除搜索</Button>}
                 {view !== 'completed' && !query && (
                   <Button onClick={focusCapture}>
@@ -319,9 +296,7 @@ export function PlannerWorkspace() {
             ) : (
               <TaskList tasks={sorted} sortable={sortable} showDate />
             )}
-            {sortable && sorted.length > 1 && (
-              <p className="list-footnote">拖动手柄可调整顺序；也可按空格选中，再用方向键移动。</p>
-            )}
+            
           </>
         )}
       </div>

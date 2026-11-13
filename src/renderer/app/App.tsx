@@ -1,6 +1,6 @@
 import { Component, lazy, Suspense, useEffect, type ErrorInfo, type ReactNode } from 'react'
 import { AnimatePresence, useReducedMotion } from 'motion/react'
-import { AlertCircle, Orbit } from 'lucide-react'
+import { AlertCircle } from 'lucide-react'
 import { useWorkbench } from '../stores/workbench'
 import { useTasks } from '../hooks/use-tasks'
 import { useAppearance } from '../hooks/use-appearance'
@@ -20,6 +20,7 @@ import { useAssistant } from '../stores/assistant'
 import { AssistantDialog } from '../components/planner/AssistantDialog'
 import { GlobalSearch } from '../components/layout/GlobalSearch'
 import { WorkspaceTransition } from '../components/layout/WorkspaceTransition'
+import { useWorkbenchCodex } from '../stores/workbench-codex'
 
 const LiteratureWorkspace = lazy(() =>
   import('../components/literature/LiteratureWorkspace').then((m) => ({
@@ -38,6 +39,7 @@ const SubmissionsWorkspace = lazy(() =>
   }))
 )
 const ReportsWorkspace = lazy(() => import('../components/reports/ReportsWorkspace').then(m => ({ default: m.ReportsWorkspace })))
+const CodexWorkspace = lazy(() => import('../components/codex/CodexWorkspace').then(m => ({ default: m.CodexWorkspace })))
 
 async function flushWorkspace() {
   if (useAssistant.getState().busy) {
@@ -78,7 +80,28 @@ function Workbench() {
   const selectedTaskId = useWorkbench((s) => s.selectedTaskId)
   const tasks = useTasks()
   const reducedMotion = useReducedMotion()
+  const libraryLoaded = useLibrary(s => s.loaded || Boolean(s.loadError))
+  useEffect(() => {
+    if ((ready && (!new URLSearchParams(location.search).has('paper') || libraryLoaded)) || startupError) window.workbench.workbenchReady()
+  }, [ready, libraryLoaded, startupError])
   useAppearance()
+  useEffect(() => {
+    const open = async (paper: { id: string; variant: 'source' | 'translated' }) => {
+      useWorkbench.getState().setSection('literature')
+      useLibrary.getState().openPaper(paper.id, paper.variant, undefined, undefined, true)
+      await useLibrary.getState().load()
+    }
+    const off = window.workbench.onOpenDesktopPaper(paper => { void open(paper) })
+    return off
+  }, [])
+  useEffect(() => {
+    if (new URLSearchParams(location.search).get('section') === 'submissions') useWorkbench.getState().setSection('submissions')
+  }, [])
+  useEffect(() => window.workbench.onTasksChanged(() => {
+    void window.workbench.desktopTasks().then(result => {
+      if (result.ok) useWorkbench.setState({ tasks: result.data.tasks, projects: result.data.projects })
+    })
+  }), [])
   useEffect(() => {
     void bootstrap()
     void useAssistant.getState().load()
@@ -88,8 +111,8 @@ function Workbench() {
     const off = window.workbench.onLibraryChanged(() => {
       void useLibrary.getState().load()
     })
-    const offProgress = window.workbench.onTranslationProgress((progress) =>
-      useLibrary.getState().setTranslationProgress(progress)
+    const offProgress = window.workbench.onTranslationProgress((progress, active) =>
+      useLibrary.getState().setTranslationProgress(progress, active)
     )
     void useLibrary.getState().load()
     return () => {
@@ -147,21 +170,23 @@ function Workbench() {
   const workspace = section === 'planner' ? (
     <PlannerWorkspace />
   ) : section === 'literature' ? (
-    <Suspense fallback={<div className="startup-state">正在打开文献库…</div>}>
+    <Suspense fallback={<WorkspaceLoading />}>
       <LiteratureWorkspace />
     </Suspense>
   ) : section === 'outputs' ? (
-    <Suspense fallback={<div className="startup-state">正在打开科研成果…</div>}>
+    <Suspense fallback={<WorkspaceLoading />}>
       <OutputsWorkspace />
     </Suspense>
   ) : section === 'submissions' ? (
-    <Suspense fallback={<div className="startup-state">正在打开投稿记录…</div>}>
+    <Suspense fallback={<WorkspaceLoading />}>
       <SubmissionsWorkspace />
     </Suspense>
   ) : section === 'reports' ? (
-    <Suspense fallback={<div className="startup-state">正在打开研究报表…</div>}><ReportsWorkspace /></Suspense>
+    <Suspense fallback={<WorkspaceLoading />}><ReportsWorkspace /></Suspense>
+  ) : section === 'codex' ? (
+    <Suspense fallback={<WorkspaceLoading />}><CodexWorkspace /></Suspense>
   ) : (
-    <Suspense fallback={<div className="startup-state">正在打开设置…</div>}>
+    <Suspense fallback={<WorkspaceLoading />}>
       <SettingsWorkspace />
     </Suspense>
   )
@@ -173,8 +198,7 @@ function Workbench() {
         <div className="startup-state">
           {loading ? (
             <>
-              <Orbit size={28} strokeWidth={1.5} />
-              <p>正在打开科研工作台…</p>
+              <span className="workspace-spinner" role="status" aria-label="加载工作台" />
             </>
           ) : (
             <>
@@ -190,16 +214,18 @@ function Workbench() {
           <Sidebar />
           <MetadataQueue />
           <div className="main-region">
-            <AnimatePresence initial={false} mode="popLayout">
-              <WorkspaceTransition key={workspaceKey} reduced={!!reducedMotion}>
-                {workspace}
-              </WorkspaceTransition>
-            </AnimatePresence>
-            <AnimatePresence initial={false}>
-              {section === 'planner' && task && <TaskInspector key="task-inspector" task={task} />}
-            </AnimatePresence>
+            <div className="workspace-frame">
+              <AnimatePresence initial={false} mode="popLayout">
+                <WorkspaceTransition key={workspaceKey} reduced={!!reducedMotion}>
+                  {workspace}
+                </WorkspaceTransition>
+              </AnimatePresence>
+              <AnimatePresence initial={false}>
+                {section === 'planner' && task && <TaskInspector key="task-inspector" task={task} />}
+              </AnimatePresence>
+            </div>
+            <Dock />
           </div>
-          <Dock />
           <AssistantDialog />
           <GlobalSearch />
         </>
@@ -209,11 +235,21 @@ function Workbench() {
   )
 }
 export function App() {
+  useEffect(() => window.workbench.onWorkbenchCodexEvent(useWorkbenchCodex.getState().receive), [])
   // Keep the close handshake mounted even when a workspace fails to render.
   useEffect(() => window.workbench.onBeforeClose(flushWorkspace), [])
+  useEffect(() => window.workbench.onWorkbenchShown(() => {
+    useLibrary.setState({ returningToDesktop: false })
+    const shell = document.querySelector('.app-shell')
+    if (!shell) return
+    const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
+    for (const animation of shell.getAnimations()) animation.cancel()
+    shell.animate(reduced ? [{ opacity: .7 }, { opacity: 1 }] : [{ opacity: .65, transform: 'translateX(12px) scale(.985)' }, { opacity: 1, transform: 'none' }], { duration: reduced ? 100 : 360, easing: 'cubic-bezier(.22,1,.36,1)' })
+  }), [])
   return (
     <ErrorBoundary>
       <Workbench />
     </ErrorBoundary>
   )
 }
+function WorkspaceLoading() { return <div className="startup-state" role="status" aria-label="加载工作区"><span className="workspace-spinner"/></div> }

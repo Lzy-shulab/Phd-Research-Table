@@ -7,6 +7,7 @@ import { useLibrary } from '../../stores/library'
 import { PdfCover } from '../literature/PdfCover'
 import { Button } from '../ui/button'
 import { publicationHonorDetails } from './publication-honors'
+import { arrivalEase, departureEase } from '../../lib/motion'
 
 function binding(id: string) {
   let value = 0
@@ -36,14 +37,14 @@ export function PublicationBookcase({ papers, edit, translate }: { papers: Paper
   const rows = Array.from({ length: Math.ceil(papers.length / perShelf) }, (_, index) => papers.slice(index * perShelf, (index + 1) * perShelf))
   const closeFor = (action: () => void) => { handingOff.current = true; setOpen(false); action() }
   const pose = reduced ? { opacity: 0 } : {
-    opacity: 0, scale: 0.16, x: (selection?.x ?? innerWidth / 2) - innerWidth / 2,
-    y: (selection?.y ?? innerHeight / 2) - innerHeight / 2, rotateY: -75
+    opacity: .2, scale: 0.55, x: ((selection?.x ?? innerWidth / 2) - innerWidth / 2) * .65,
+    y: ((selection?.y ?? innerHeight / 2) - innerHeight / 2) * .65, rotateY: -28
   }
   return <div className="publication-bookcase" ref={host} aria-label="科研成果书架">
     {rows.map((row, shelf) => <section className="book-shelf" key={shelf} aria-label={`第 ${shelf + 1} 层书架`}>
       <div className="book-shelf-books">{row.map((item, index) => {
         const design = binding(item.id)
-        return <motion.div key={item.id} className="book-arrival" initial={reduced ? false : { opacity: 0.4, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: reduced ? 0 : 0.34, delay: reduced ? 0 : Math.min(index * 0.035, 0.245), ease: [0.16, 1, 0.3, 1] }}><motion.button type="button" className={`publication-book book-tone-${design.tone}`}
+        return <motion.div key={item.id} className="book-arrival" initial={reduced ? false : { opacity: 0.72, y: 7 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: reduced ? 0 : 0.23, delay: reduced ? 0 : Math.min(index * .012, .085), ease: arrivalEase }}><motion.button type="button" className={`publication-book book-tone-${design.tone}`}
           data-testid="publication-book" aria-label={`抽出论文 ${item.title}`} aria-haspopup="dialog" title={`${item.title}\n${item.authors}\n${item.journal} · ${item.publishedDate}`}
           style={{ '--book-height': `${design.height}px`, '--book-width': `${design.width}px` } as CSSProperties}
           animate={reduced ? { y: 0, rotate: 0, opacity: 1 } : open && selection?.id === item.id ? { y: -28, rotate: -5, opacity: 0.3 } : { y: hovered === item.id && !open ? -10 : 0, rotate: 0, opacity: 1 }}
@@ -68,22 +69,20 @@ export function PublicationBookcase({ papers, edit, translate }: { papers: Paper
       <AnimatePresence>
         {open && paper && <Dialog.Portal forceMount key={paper.id}>
           <Dialog.Overlay forceMount asChild><motion.div className="book-detail-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reduced ? 0.1 : 0.2 }} /></Dialog.Overlay>
-          <Dialog.Content forceMount asChild onCloseAutoFocus={(event) => {
+          <Dialog.Content forceMount asChild aria-describedby={undefined} onCloseAutoFocus={(event) => {
             event.preventDefault()
             if (!handingOff.current && trigger.current?.isConnected) trigger.current.focus({ preventScroll: true })
           }}>
             <motion.div className={`book-detail book-tone-${binding(paper.id).tone}`} data-testid="publication-detail"
               initial={pose} animate={{ opacity: 1, scale: 1, x: 0, y: 0, rotateY: 0 }}
-              exit={{ ...pose, transition: { delay: reduced ? 0 : 0.27, duration: reduced ? 0.1 : 0.4 } }}
-              transition={{ type: 'tween', duration: reduced ? 0.1 : 0.56, ease: [0.22, 1, 0.36, 1] }}>
+              exit={{ ...pose, opacity: 0, transition: { duration: reduced ? .08 : .2, ease: departureEase } }}
+              transition={{ type: 'tween', duration: reduced ? .08 : .34, ease: arrivalEase }}>
               <div className="book-detail-preview">
-                <span className="book-detail-edition">研究藏书 <span>{paper.publishedDate.slice(0, 4)}</span></span>
+                <span className="book-detail-edition">{paper.publishedDate.slice(0, 4)}</span>
                 <div className="book-title-page"><PdfCover key={paper.id} paper={paper} /></div>
-                <span className="book-detail-preview-caption">论文标题页 <span>01</span></span>
               </div>
               <div className="book-detail-information">
                 <div className="book-detail-scroll">
-                  <Dialog.Description className="book-detail-eyebrow">发表记录 <span>PUBLICATION</span></Dialog.Description>
                   <Dialog.Title className="book-detail-title">{paper.title}</Dialog.Title>
                   <dl className="book-detail-metadata">
                     <div className="wide"><dt>作者</dt><dd>{paper.authors || '暂未填写'}</dd></div>
@@ -115,9 +114,9 @@ export function PublicationBookcase({ papers, edit, translate }: { papers: Paper
               </div>
               {!reduced && <motion.div className="book-opening-cover" aria-hidden="true"
                 initial={{ rotateY: 0, opacity: 1 }} animate={{ rotateY: -180, opacity: [1, 1, 0] }}
-                exit={{ rotateY: 0, opacity: 1, transition: { duration: 0.26 } }}
-                transition={{ rotateY: { delay: 0.22, duration: 0.54, ease: [0.33, 0, 0.2, 1] }, opacity: { delay: 0.22, duration: 0.54, times: [0, 0.92, 1] } }}>
-                <span>研究藏书 / PUBLICATION</span><strong>{paper.title}</strong><span>{paper.journal} · {paper.publishedDate.slice(0, 4)}</span>
+                exit={{ rotateY: 0, opacity: 0, transition: { duration: .12 } }}
+                transition={{ rotateY: { delay: .08, duration: .31, ease: arrivalEase }, opacity: { delay: .08, duration: .31, times: [0, .78, 1] } }}>
+                <strong>{paper.title}</strong><span>{paper.journal} · {paper.publishedDate.slice(0, 4)}</span>
               </motion.div>}
               <Dialog.Close asChild><button className="book-detail-close" aria-label="放回书架"><X size={19} /></button></Dialog.Close>
             </motion.div>

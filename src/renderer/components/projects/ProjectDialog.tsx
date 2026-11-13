@@ -47,7 +47,7 @@ export function ProjectDialog({
           if (!open && !busy) onClose()
         }}
         title={project ? '项目详情' : '新建项目'}
-        description="将相关研究任务整理到同一个项目中。"
+        
       >
         <form
           onSubmit={(e) => {

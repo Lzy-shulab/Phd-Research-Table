@@ -4,6 +4,8 @@ import { DomainError } from '../../domain/errors'
 import {
   defaultTranslationActiveId,
   defaultTranslationProfiles,
+  codexReasoningEfforts,
+  type CodexReasoningEffort,
   translationProfileRequiresKey,
   type TranslationApiProfile,
   type TranslationProfileInput,
@@ -24,6 +26,7 @@ interface StoredProfile {
   builtIn: boolean
   note: string
   encryptedApiKey: string
+  reasoningEffort?: CodexReasoningEffort
 }
 
 interface StoredState {
@@ -50,7 +53,7 @@ const defaults = (): StoredProfile[] => defaultTranslationProfiles.map((profile)
 }))
 
 function isProvider(value: unknown): value is TranslationProvider {
-  return ['siliconflowfree', 'gemini', 'siliconflow', 'openai-compatible'].includes(String(value))
+  return ['siliconflowfree', 'gemini', 'siliconflow', 'openai-compatible', 'codex-cli'].includes(String(value))
 }
 
 function cleanStoredProfile(value: unknown): StoredProfile | null {
@@ -65,12 +68,13 @@ function cleanStoredProfile(value: unknown): StoredProfile | null {
     baseUrl: typeof profile.baseUrl === 'string' ? profile.baseUrl.slice(0, 2000) : '',
     builtIn: profile.builtIn === true,
     note: typeof profile.note === 'string' ? profile.note.slice(0, 500) : '',
-    encryptedApiKey: typeof profile.encryptedApiKey === 'string' ? profile.encryptedApiKey : ''
+    encryptedApiKey: typeof profile.encryptedApiKey === 'string' ? profile.encryptedApiKey : '',
+    reasoningEffort: codexReasoningEfforts.includes(profile.reasoningEffort!) ? profile.reasoningEffort : 'default'
   }
 }
 
 function profileReady(profile: StoredProfile) {
-  if (profile.provider === 'siliconflowfree') return true
+  if (profile.provider === 'siliconflowfree' || profile.provider === 'codex-cli') return true
   if (!profile.model || !profile.encryptedApiKey) return false
   return profile.provider === 'gemini' || !!profile.baseUrl
 }
@@ -85,7 +89,8 @@ function publicProfile(profile: StoredProfile): TranslationApiProfile {
     builtIn: profile.builtIn,
     hasApiKey: !!profile.encryptedApiKey,
     ready: profileReady(profile),
-    note: profile.note
+    note: profile.note,
+    reasoningEffort: profile.reasoningEffort ?? 'default'
   }
 }
 
@@ -116,7 +121,7 @@ export class TranslationProfileStore {
       const merged = builtIns.map((preset) => {
         const saved = byId.get(preset.id)
         byId.delete(preset.id)
-        return saved ? { ...preset, model: saved.model, baseUrl: saved.baseUrl, encryptedApiKey: saved.encryptedApiKey } : preset
+        return saved ? { ...preset, model: saved.model, baseUrl: saved.baseUrl, encryptedApiKey: saved.encryptedApiKey, reasoningEffort: saved.reasoningEffort } : preset
       })
       for (const profile of byId.values()) merged.push({ ...profile, builtIn: false })
       const activeId = typeof parsed.activeId === 'string' && merged.some((profile) => profile.id === parsed.activeId)
@@ -144,20 +149,21 @@ export class TranslationProfileStore {
     const provider = builtIn ? existing.provider : input.provider
     const name = (builtIn ? existing.name : input.name).trim()
     const model = provider === 'siliconflowfree' ? '' : input.model.trim()
-    const baseUrl = provider === 'gemini' || provider === 'siliconflowfree' ? '' : cleanBaseUrl(input.baseUrl)
+    const baseUrl = provider === 'gemini' || !translationProfileRequiresKey(provider) ? '' : cleanBaseUrl(input.baseUrl)
     if (!name) throw new DomainError('VALIDATION', '请填写配置名称。')
-    if (provider !== 'siliconflowfree' && !model) throw new DomainError('VALIDATION', '请填写模型名称。')
+    if (translationProfileRequiresKey(provider) && !model) throw new DomainError('VALIDATION', '请填写模型名称。')
     let encryptedApiKey = existing?.encryptedApiKey ?? ''
-    if (provider === 'siliconflowfree' || input.clearApiKey) encryptedApiKey = ''
+    if (!translationProfileRequiresKey(provider) || input.clearApiKey) encryptedApiKey = ''
     const apiKey = input.apiKey?.trim() ?? ''
-    if (apiKey) {
+    if (apiKey && translationProfileRequiresKey(provider)) {
       if (!this.secrets.available()) throw new DomainError('UNAVAILABLE', '当前系统无法安全保存 API 密钥，请使用免密钥服务或稍后重试。')
       encryptedApiKey = this.secrets.encrypt(apiKey)
     }
     const profile: StoredProfile = {
       id: existing?.id ?? randomUUID(), name, provider, model, baseUrl, builtIn,
       note: existing?.note ?? '自定义 API 配置；免费额度、模型可用性和数据处理规则以服务商当前说明为准。',
-      encryptedApiKey
+      encryptedApiKey,
+      reasoningEffort: codexReasoningEfforts.includes(input.reasoningEffort!) ? input.reasoningEffort : 'default'
     }
     const index = existing ? state.profiles.indexOf(existing) : -1
     if (index >= 0) state.profiles[index] = profile
@@ -199,7 +205,7 @@ export class TranslationProfileStore {
       try { apiKey = this.secrets.decrypt(profile.encryptedApiKey) }
       catch { throw new DomainError('UNAVAILABLE', 'API 密钥无法在当前系统账户中解密，请重新填写。') }
     }
-    return { id: profile.id, name: profile.name, provider: profile.provider, model: profile.model, baseUrl: profile.baseUrl, apiKey }
+    return { id: profile.id, name: profile.name, provider: profile.provider, model: profile.model, baseUrl: profile.baseUrl, apiKey, reasoningEffort: profile.reasoningEffort ?? 'default' }
   }
 }
 

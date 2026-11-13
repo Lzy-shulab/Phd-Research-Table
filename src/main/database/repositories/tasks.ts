@@ -37,6 +37,7 @@ export class TaskRepository {
       scheduledDate: input.scheduledDate ?? null,
       startTime: input.startTime ?? null,
       endTime: input.endTime ?? null,
+      reminderMinutes: input.reminderMinutes ?? null,
       estimatedMinutes: null,
       deferredUntil: null,
       seriesId: null,

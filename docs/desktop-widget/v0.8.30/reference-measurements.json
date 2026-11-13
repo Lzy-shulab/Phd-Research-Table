@@ -1,0 +1,112 @@
+{
+  "referenceDirectory": "../v0.8.29",
+  "normal": {
+    "imageSize": [
+      1086,
+      1448
+    ],
+    "panelBounds": [
+      147,
+      161,
+      792,
+      1157
+    ],
+    "logicalSize": [
+      420,
+      614
+    ],
+    "contentInset": 26,
+    "cornerRadius": 28,
+    "home": {
+      "weatherTop": 28,
+      "clockTop": 68,
+      "clockFont": 90,
+      "dividerTop": 172,
+      "periodTop": 194,
+      "ringDiameter": 124,
+      "today": [
+        26,
+        394,
+        368,
+        54
+      ],
+      "absenceActions": [
+        26,
+        458,
+        368,
+        57
+      ],
+      "focusAction": [
+        26,
+        526,
+        368,
+        66
+      ]
+    },
+    "week": {
+      "tabsTop": 64,
+      "summaryTop": 118,
+      "tableTop": 180,
+      "tableHeight": 370,
+      "dateLayout": "inline weekday"
+    },
+    "month": {
+      "tabsTop": 70,
+      "summaryTop": 125,
+      "tableTop": 180,
+      "rowHeight": 55,
+      "dateLayout": "stacked weekday"
+    },
+    "checkin": {
+      "formTop": 75,
+      "dateHeight": 46,
+      "timeHeight": 48,
+      "notesHeight": 74,
+      "saveHeight": 54,
+      "recordHeight": 42
+    },
+    "trip": {
+      "dateLayout": "stacked label",
+      "primaryHeight": 60
+    },
+    "leave": {
+      "dateLayout": "inline label",
+      "primaryHeight": 60
+    },
+    "city": {
+      "searchTop": 111,
+      "searchHeight": 50,
+      "resultRowHeight": 68
+    },
+    "settings": {
+      "switchHeight": 25,
+      "sliderThumb": 16,
+      "sectionDividers": [
+        307,
+        450
+      ]
+    }
+  },
+  "focus": {
+    "imageSize": [
+      1734,
+      907
+    ],
+    "panelBounds": [
+      305,
+      198,
+      1124,
+      512
+    ],
+    "logicalSize": [
+      420,
+      192
+    ],
+    "cornerRadius": 20,
+    "clockTop": 13,
+    "clockFont": 72,
+    "timerTop": 97,
+    "subjectTop": 146
+  },
+  "note": "Reference frame measurements; actual UI uses DOM, native inputs, Lucide and SVG rings. No image background is included in the panel."
+}

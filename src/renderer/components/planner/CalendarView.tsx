@@ -56,9 +56,7 @@ export function CalendarView({ tasks }: { tasks: Task[] }) {
         </div>
       </div>
       <ScheduleGrid dates={dates} tasks={tasks.filter((t) => t.status !== 'completed')} />
-      <p className="calendar-hint">
-        点击或拖选空白区域创建任务；拖动任务或上下边缘可按分钟调整。
-      </p>
+      
     </section>
   )
 }

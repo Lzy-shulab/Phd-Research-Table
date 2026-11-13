@@ -2,6 +2,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { readFileSync, existsSync, readdirSync, statSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join, dirname, resolve } from 'node:path'
 import assert from 'node:assert/strict'
+import { isDeepStrictEqual } from 'node:util'
 
 // Hold the baseline in memory; only aggregate results are written to the evidence file.
 const evidence = resolve(process.argv[2] || 'test-results/release-data')
@@ -41,7 +42,13 @@ const timer = setInterval(() => {
   if (!existsSync(join(evidence, 'compare.signal'))) return
   clearInterval(timer)
   try {
-    assert.deepEqual(database(), before, 'Stored records and individual settings changed')
+    const current = database()
+    const changedTables = Object.keys(before).filter(name => !isDeepStrictEqual(current[name], before[name]))
+    if (changedTables.length) {
+      const earlierSettings = new Map((before.app_settings ?? []).map(row => [row.key, row.value]))
+      const changedSettingKeys = (current.app_settings ?? []).filter(row => earlierSettings.get(row.key) !== row.value).map(row => row.key)
+      throw new Error(`Stored content changed during observation. Tables: ${changedTables.join(', ')}. Settings keys: ${changedSettingKeys.join(', ')}`)
+    }
     for (const [path, original] of bytes) {
       assert.equal(statSync(path).size, original.length, 'Referenced file size changed')
       assert.ok(readFileSync(path).equals(original), 'Referenced file content changed')

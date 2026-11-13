@@ -24,7 +24,7 @@ describe('Interface preferences and engine progress', () => {
       expect(restored).toMatchObject({ fontSize: 18, background: 'sage', dockAutoHide: true })
       expect(connection.sqlite.prepare("SELECT * FROM app_settings WHERE key <> 'interface.preferences' ORDER BY key").all()).toEqual(before)
       expect(connection.sqlite.pragma('integrity_check', { simple: true })).toBe('ok')
-      expect(connection.sqlite.prepare('SELECT * FROM __drizzle_migrations').all()).toHaveLength(8)
+      expect(connection.sqlite.prepare('SELECT count(*) AS total FROM __drizzle_migrations').get()).toEqual({ total: 9 })
     } finally { connection.close(); rmSync(directory, { recursive: true, force: true }) }
   })
   it('rejects arbitrary font sizes, unknown settings and unowned background paths', () => {
@@ -38,7 +38,7 @@ describe('Interface preferences and engine progress', () => {
     expect(interfacePreferencesSchema.safeParse({ ...defaultInterfacePreferences, backgroundFile: '../private.jpg' }).success).toBe(false)
   })
   it('uses only finite engine progress, preserves unknown progress, and reserves completion for output validation', () => {
-    expect(parseEngineProgress('@@WORKBENCH_PROGRESS@@{"stage":"Translate Paragraphs","percent":42.9,"current":12,"total":28}')).toEqual({ stage: '正在翻译正文', percent: 42, current: 12, total: 28 })
+    expect(parseEngineProgress('@@WORKBENCH_PROGRESS@@{"stage":"Translate Paragraphs","percent":42.9,"current":12,"total":28}')).toEqual({ stage: '正在翻译正文', step: 'translate', percent: 42, current: 12, total: 28 })
     expect(parseEngineProgress('@@WORKBENCH_PROGRESS@@{"stage":"Preparing translation engine"}')?.percent).toBeNull()
     expect(parseEngineProgress('@@WORKBENCH_PROGRESS@@{"stage":"Typesetting","percent":100}')?.percent).toBe(99)
     expect(parseEngineProgress('@@WORKBENCH_PROGRESS@@{"stage":"Typesetting","percent":"50"}')?.percent).toBeNull()

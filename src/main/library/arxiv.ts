@@ -67,7 +67,8 @@ export function arxivQuery(directions: string[], from: string, through: string) 
   return `(${query}) AND submittedDate:[${from.replaceAll('-', '')}0000 TO ${through.replaceAll('-', '')}2359]`
 }
 const normalized = (text: string) => text.toLowerCase().replace(/[-‐‑–]/g, ' ').replace(/\s+/g, ' ')
-export function relevance(entry: ArxivEntry, directions: string[]) {
+type SearchText = Pick<ArxivEntry, 'title' | 'abstract'>
+export function relevance(entry: SearchText, directions: string[]) {
   const title = normalized(entry.title), full = `${title} ${normalized(entry.abstract)}`
   let score = 0
   for (const direction of directions) {
@@ -79,9 +80,14 @@ export function relevance(entry: ArxivEntry, directions: string[]) {
   }
   return score
 }
-export function relevanceReasons(entry: ArxivEntry, directions: string[]) {
+export function relevanceReasons(entry: SearchText, directions: string[]) {
   const full = normalized(`${entry.title} ${entry.abstract}`)
   return directions.filter((direction) => directionTerms(direction).map(normalized).every((term) => full.includes(term)))
+}
+export function matchesDailySearch(entry: SearchText, settings: ArxivSettings) {
+  const full = normalized(`${entry.title} ${entry.abstract}`)
+  return relevance(entry, settings.directions) > 0 &&
+    !settings.excludedKeywords.map(normalized).filter(Boolean).some(keyword => full.includes(keyword))
 }
 function readJson<T>(repo: LibraryRepository, key: string, fallback: T): T {
   try { return JSON.parse(repo.setting(key, JSON.stringify(fallback))) as T } catch { return fallback }
@@ -141,6 +147,7 @@ export class ArxivDailyService {
     this.persistCandidates(); this.changed()
   }
   setTranslator(translate: Dependencies['translate']) { this.dependencies.translate = translate }
+  searchSettings() { return this.settings }
   private ready(candidate: ArxivCandidate) {
     return candidate.overview?.sourceAbstract === candidate.abstract && overviewTranslationSchema.safeParse({ titleZh: candidate.overview.titleZh, abstractZh: candidate.overview.abstractZh }).success
   }
@@ -295,11 +302,7 @@ export class ArxivDailyService {
       // Decisions and downloads can complete while a search is awaiting the network.
       const seen = new Set(this.repo.downloads().map((item) => item.arxivId))
       const ignored = new Set(this.candidates.filter((candidate) => candidate.ignored).map((candidate) => candidate.arxivId))
-      const exclusions = this.settings.excludedKeywords.map(normalized).filter(Boolean)
-      const entries = found.filter((entry) => {
-        const full = normalized(`${entry.title} ${entry.abstract}`)
-        return !seen.has(entry.arxivId) && !ignored.has(entry.arxivId) && relevance(entry, this.settings.directions) > 0 && !exclusions.some((keyword) => full.includes(keyword))
-      })
+      const entries = found.filter(entry => !seen.has(entry.arxivId) && !ignored.has(entry.arxivId) && matchesDailySearch(entry, this.settings))
         .sort((a, b) => relevance(b, this.settings.directions) - relevance(a, this.settings.directions) || b.publishedDate.localeCompare(a.publishedDate))
       run.candidates = entries.length
       const previous = new Map(this.candidates.map((candidate) => [candidate.arxivId, candidate]))

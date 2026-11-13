@@ -42,8 +42,8 @@ export function Dock() {
     gsap.set(indicator.current, { width: selected.offsetWidth, height: selected.offsetHeight })
     gsap.to(indicator.current, {
       x: selected.offsetLeft, y: selected.offsetTop, opacity: 1,
-      duration: !placed.current || reducedMotion ? 0 : 0.38,
-      ease: 'power4.out', overwrite: true
+      duration: !placed.current || reducedMotion ? 0 : 0.31,
+      ease: 'power3.out', overwrite: 'auto'
     })
     placed.current = true
   }, { scope: container, dependencies: [section, reducedMotion] })
@@ -72,7 +72,6 @@ export function Dock() {
       onFocusCapture={reveal}
       onBlurCapture={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) hide() }}
     >
-      <span className="dock-reveal-handle" aria-hidden="true" />
       <nav className="dock" aria-label="科研工作空间">
         <span ref={indicator} className="dock-selection" aria-hidden="true" />
         {modules.map((item) => (
@@ -87,6 +86,7 @@ export function Dock() {
           </button>
         ))}
       </nav>
+      {autoHide && <span className="dock-reveal-handle" aria-hidden="true" />}
     </div>
   )
 }

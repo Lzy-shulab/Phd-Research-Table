@@ -22,7 +22,7 @@ export function CheckinAbsenceForm({ entry, kind, busy, save, cancel }: {
     <label className="field">开始日期<input aria-label="出差或休假开始日期" type="date" required value={draft.startDate} onChange={event => setDraft({ ...draft, startDate: event.target.value, endDate: draft.endDate < event.target.value ? event.target.value : draft.endDate })} /></label>
     <label className="field">结束日期<input aria-label="出差或休假结束日期" type="date" required min={draft.startDate} value={draft.endDate} onChange={event => setDraft({ ...draft, endDate: event.target.value })} /></label>
     <label className="field">备注（选填）<input aria-label="出差或休假备注" maxLength={1000} value={draft.notes} placeholder="如会议出差、年假" onChange={event => setDraft({ ...draft, notes: event.target.value })} /></label>
-    <p className="report-entry-notice">单日请填写相同的起止日期。区间内每天从周、月目标扣除 12 小时，周末和节假日同样扣除；当天打卡不计入累计。</p>
+    <p className="report-entry-notice">每天扣减 12 小时目标（含周末和节假日），当天打卡不计入累计。</p>
     {error && <p className="report-entry-notice report-error" role="alert">{error}</p>}
     <div className="report-form-actions"><Button type="submit" variant="primary" disabled={busy}>{entry ? '保存日期修改' : `保存${label}日期`}</Button><Button disabled={busy} onClick={cancel}>取消</Button></div>
   </motion.form>

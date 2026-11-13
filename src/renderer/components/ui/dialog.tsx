@@ -15,7 +15,7 @@ export function Dialog({
   open: boolean
   onOpenChange: (open: boolean) => void
   title: string
-  description: string
+  description?: string
   className?: string
   children: ReactNode
 }) {
@@ -24,14 +24,14 @@ export function Dialog({
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="dialog-overlay" />
-        <DialogPrimitive.Content className={`dialog-content ${className ?? ''}`} onCloseAutoFocus={(event) => {
+        <DialogPrimitive.Content {...(!description ? { 'aria-describedby': undefined } : {})} className={`dialog-content ${className ?? ''}`} onCloseAutoFocus={(event) => {
           const element = origin.current
           if (element instanceof HTMLElement && element.isConnected) { event.preventDefault(); element.focus() }
         }}>
           <DialogPrimitive.Title className="dialog-title">{title}</DialogPrimitive.Title>
-          <DialogPrimitive.Description className="dialog-description">
+          {description && <DialogPrimitive.Description className="dialog-description">
             {description}
-          </DialogPrimitive.Description>
+          </DialogPrimitive.Description>}
           <DialogPrimitive.Close asChild>
             <Button variant="ghost" className="icon-button dialog-close" aria-label="关闭对话框">
               <X size={17} />

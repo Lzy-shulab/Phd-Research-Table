@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Check, ChevronDown, Clock3, EyeOff, FolderOpen, Languages, RefreshCw, Rss, Settings2, Star } from 'lucide-react'
+import { ChevronDown, Clock3, EyeOff, FolderOpen, Languages, RefreshCw, Rss, Settings2, Star } from 'lucide-react'
 import { ARXIV_LIBRARY_FOLDER, localDay } from '../../../shared/arxiv'
 import { arxivSettingsSchema } from '../../../domain/research'
 import { libraryAction, useLibrary } from '../../stores/library'
@@ -20,12 +20,12 @@ export function ArxivDailyPanel({ retrieving = false }: { retrieving?: boolean }
   return <>
     <section className="arxiv-daily-panel" aria-label="每日 arXiv 检索">
       <div className="arxiv-daily-intro"><span className="arxiv-symbol"><Rss size={22} strokeWidth={1.5} /></span>
-        <div><strong>每天，一点新的研究线索</strong><p>近 {arxiv.settings.daysBack} 天 · 最多 {arxiv.settings.maxPerDay} 篇候选 · 中英摘要就绪后供你筛选</p></div>
+        <div><strong>检索范围</strong><p>近 {arxiv.settings.daysBack} 天 · 最多 {arxiv.settings.maxPerDay} 篇候选</p></div>
         <span className="daily-number"><b>{todayCount}</b>今日收录</span>
       </div>
       <div className="arxiv-daily-bottom">
         <span><Clock3 size={13} />{arxiv.settings.enabled ? '每天首次打开自动检索' : '自动检索已关闭'}</span>
-        <span><Check size={13} />标题与摘要自动翻译 · 全文按需翻译</span>
+        
         <Button variant="ghost" onClick={() => useLibrary.getState().selectFolder(ARXIV_LIBRARY_FOLDER)}><FolderOpen size={14} />已收藏文献</Button>
         <Button variant="ghost" onClick={() => void libraryAction(window.workbench.revealArxivDirectory())}><FolderOpen size={14} />下载目录</Button>
         <Button variant="ghost" disabled={arxiv.running} onClick={() => setSettings(true)}><Settings2 size={14} />检索设置</Button>
@@ -47,7 +47,7 @@ export function ArxivDailyPanel({ retrieving = false }: { retrieving?: boolean }
     </section>}
     {arxiv.candidates.length > 0 && <section className="arxiv-candidates" aria-label="arXiv 候选论文">
       <header className="arxiv-candidates-heading">
-        <div><span className="arxiv-queue-icon"><Rss size={18} strokeWidth={1.6} /></span><div><h2>待筛选候选 <span>{arxiv.candidates.length}</span></h2><p>中英标题与摘要已就绪；收藏后下载到「我的文件夹 · Arvix」。</p></div></div>
+        <div><span className="arxiv-queue-icon"><Rss size={18} strokeWidth={1.6} /></span><div><h2>待筛选候选 <span>{arxiv.candidates.length}</span></h2></div></div>
         <span className="arxiv-queue-status">中英对照</span>
       </header>
       <div className="arxiv-candidate-list">
@@ -79,19 +79,19 @@ export function ArxivDailyPanel({ retrieving = false }: { retrieving?: boolean }
         })}
       </div>
     </section>}
-    {!arxiv.running && !arxiv.candidates.length && !preparation.pending && !preparation.failed && <div className="arxiv-discovery-empty"><Rss size={28} strokeWidth={1.5} /><h2>{latest ? '本轮没有待筛选候选' : '从下一篇新论文开始'}</h2><p>{latest ? '可调整研究关键词重新检索，已收藏的文献在 Arvix 文件夹中。' : '点击立即检索，标题与摘要翻译完成后会显示在这里。'}</p><Button onClick={() => useLibrary.getState().selectFolder(ARXIV_LIBRARY_FOLDER)}><FolderOpen size={15} />阅读已收藏文献</Button></div>}
+    {!arxiv.running && !arxiv.candidates.length && !preparation.pending && !preparation.failed && <div className="arxiv-discovery-empty"><Rss size={28} strokeWidth={1.5} /><h2>{latest ? '本轮没有待筛选候选' : '从下一篇新论文开始'}</h2><Button onClick={() => useLibrary.getState().selectFolder(ARXIV_LIBRARY_FOLDER)}><FolderOpen size={15} />阅读已收藏文献</Button></div>}
     {preview && <PaperOverviewDialog key={preview.id} paper={preview} onClose={() => setPreview(null)} />}
     {settings && <ArxivSettingsDialog onClose={() => setSettings(false)} />}
   </>
 }
-function ArxivSettingsDialog({ onClose }: { onClose: () => void }) {
+export function ArxivSettingsDialog({ onClose, shared = false }: { onClose: () => void; shared?: boolean }) {
   const settings = useLibrary((s) => s.arxiv.settings)
   const [draft, setDraft] = useState(settings)
   const [directions, setDirections] = useState(settings.directions.join('\n'))
   const [excludedKeywords, setExcludedKeywords] = useState(settings.excludedKeywords.join('\n'))
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
-  return <Dialog open title="Arxiv Daily 设置" description="检索后自动翻译标题与摘要，使用设置中的 AI 助手模型；收藏后下载原文。" onOpenChange={(open) => { if (!open && !busy) onClose() }}>
+  return <Dialog open title={shared ? '每日文献检索设置' : 'Arxiv Daily 设置'} onOpenChange={(open) => { if (!open && !busy) onClose() }}>
     <form className="project-form" onSubmit={async (event) => {
       event.preventDefault(); if (busy) return
       const parsed = arxivSettingsSchema.safeParse({ ...draft, directions: directions.split('\n').map((line) => line.trim()).filter(Boolean), excludedKeywords: excludedKeywords.split('\n').map((line) => line.trim()).filter(Boolean) })
@@ -103,13 +103,13 @@ function ArxivSettingsDialog({ onClose }: { onClose: () => void }) {
         await useLibrary.getState().load(); onClose()
       } catch { setError('设置未能保存，请重试。') } finally { setBusy(false) }
     }}>
-      <label className="import-translation"><Clock3 size={20} /><span><strong>每日自动检索</strong><small>每天首次打开执行；持续运行时跨天自动执行</small></span>
+      <label className="import-translation"><Clock3 size={20} /><span><strong>每日自动检索</strong><small>每天首次打开时检索 Arxiv Daily 和 Paper Daily</small></span>
         <input type="checkbox" role="switch" aria-label="每日自动检索" checked={draft.enabled} onChange={(e) => setDraft({ ...draft, enabled: e.target.checked })} /></label>
       <div className="field-pair"><label className="field">回看天数<input type="number" min={1} max={90} required value={draft.daysBack} onChange={(e) => setDraft({ ...draft, daysBack: Number(e.target.value) })} /></label>
         <label className="field">候选展示上限<input type="number" min={1} max={50} required value={draft.maxPerDay} onChange={(e) => setDraft({ ...draft, maxPerDay: Number(e.target.value) })} /></label></div>
       <label className="field">研究关键词<textarea rows={8} aria-label="研究关键词" value={directions} onChange={(e) => setDirections(e.target.value)} required /></label>
       <label className="field">排除关键词<textarea rows={4} aria-label="排除关键词" value={excludedKeywords} onChange={(e) => setExcludedKeywords(e.target.value)} placeholder="每行一个；标题或摘要包含时排除" /></label>
-      <p className="field-hint">每行一个英文方向，例如 hyperspectral fusion。同一方向需同时匹配多个词组时，用 AND 连接，例如 Mamba AND remote sensing。无新论文时不会凑满数量。</p>
+      <p className="field-hint">每行一个方向；用 AND 连接需同时匹配的词组。</p>
       {error && <p role="alert" className="field-error">{error}</p>}
       <div className="dialog-actions"><Button onClick={onClose} disabled={busy}>取消</Button><Button type="submit" variant="primary" disabled={busy}>{busy ? '保存中…' : '保存检索设置'}</Button></div>
     </form>

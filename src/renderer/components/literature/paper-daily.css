@@ -1,0 +1,17 @@
+.paper-daily-body { display: grid; align-content: start; gap: 16px; }
+.paper-daily-body .arxiv-daily-panel { margin: 0; }
+.paper-daily-body .arxiv-daily-bottom { flex-wrap: wrap; gap: 10px; }
+.paper-daily-filters { justify-self: start; }
+.paper-daily-list { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--border-default); }
+.paper-daily-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 14px; padding: 14px 0; border-bottom: 1px solid var(--border-default); }
+.paper-daily-text { display: grid; gap: 5px; min-width: 0; }
+.paper-daily-title { text-align: left; justify-self: start; color: var(--text-primary); font-weight: 650; overflow-wrap: anywhere; }
+.paper-daily-title:hover { text-decoration: underline; }
+.paper-daily-text > :is(span, small) { color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.paper-daily-text details { color: var(--text-secondary); font-size: .86rem; }
+.paper-daily-text summary { width: max-content; cursor: pointer; }
+.paper-daily-text details p { max-width: 80ch; line-height: 1.65; margin-block: 6px; }
+.paper-daily-actions { display: flex; align-items: center; gap: 4px; }
+@media (max-width: 780px) {
+  .paper-daily-row { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+}

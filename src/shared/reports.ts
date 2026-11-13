@@ -14,8 +14,10 @@ export type StipendInput = Omit<StipendEntry, 'id' | 'createdAt'>
 export interface CheckinEntry {
   id: string; date: string; durationMinutes: number; notes: string; createdAt: string
   startTime?: string; endTime?: string; endsNextDay?: boolean
+  reminderEnabled?: boolean
 }
-export interface CheckinInput { date: string; startTime: string; endTime: string; endsNextDay: boolean; notes: string }
+export interface CheckinInput { date: string; startTime: string; endTime: string; endsNextDay: boolean; notes: string; reminderEnabled?: boolean }
+export type CheckinStart = Pick<CheckinInput, 'date' | 'startTime' | 'notes'> & { reminderEnabled: boolean }
 export type CheckinAbsenceKind = 'trip' | 'leave'
 export interface CheckinAbsenceInput { kind: CheckinAbsenceKind; startDate: string; endDate: string; notes: string }
 export interface CheckinAbsenceEntry extends CheckinAbsenceInput { id: string; createdAt: string }

@@ -43,7 +43,7 @@ export function SubmissionDialog({ submission, onClose }: { submission?: Submiss
     patch({ stages })
   }
   const patchReview = (id: string, input: Partial<NonNullable<SubmissionInput['reviewItems']>[number]>) => patch({ reviewItems: (draft.reviewItems ?? []).map((item) => item.id === id ? { ...item, ...input } : item) })
-  return <><Dialog open className="submission-dialog" title={submission ? '更新投稿记录' : '新增投稿记录'} description="按期刊系统原文记录阶段；转投、返修和结束状态保留为可追溯记录。" onOpenChange={(open) => { if (!open) requestClose() }}>
+  return <><Dialog open className="submission-dialog" title={submission ? '更新投稿记录' : '新增投稿记录'}  onOpenChange={(open) => { if (!open) requestClose() }}>
     <form className="project-form" onSubmit={async (event) => {
       event.preventDefault(); if (busy) return
       const parsed = submissionSchema.safeParse(draft)
@@ -63,11 +63,11 @@ export function SubmissionDialog({ submission, onClose }: { submission?: Submiss
         const source = submissions.find((item) => item.id === event.target.value)
         if (!source) { patch({ sourceSubmissionId: null, manuscriptGroupId: undefined }); return }
         patch({ sourceSubmissionId: source.id, manuscriptGroupId: source.manuscriptGroupId, title: source.title, projectId: source.projectId, manuscriptPaperId: source.manuscriptPaperId })
-      }}><option value="">新稿件</option>{submissions.map((item) => <option key={item.id} value={item.id}>{item.title} · {item.journal}</option>)}</select><small>选择后只复用稿件基础信息；本次期刊、稿号、阶段和期限独立保存。</small></label>}
+      }}><option value="">新稿件</option>{submissions.map((item) => <option key={item.id} value={item.id}>{item.title} · {item.journal}</option>)}</select><small>仅复用稿件信息，本轮进展单独记录。</small></label>}
       <div className="field-pair"><label className="field">关联研究项目<select value={draft.projectId ?? ''} onChange={(event) => patch({ projectId: event.target.value || null })}><option value="">暂不关联</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
         <label className="field">关联稿件 / 文献<select value={draft.manuscriptPaperId ?? ''} onChange={(event) => patch({ manuscriptPaperId: event.target.value || null })}><option value="">暂不关联</option>{papers.map((paper) => <option key={paper.id} value={paper.id}>{paper.title}</option>)}</select></label></div>
       <fieldset className="submission-stage-editor"><legend>投稿状态</legend>
-        <p className="field-hint">状态名称可使用期刊系统原文；首个状态日期同时作为投稿时间。状态按这里的顺序显示，日期应从早到晚。</p>
+        <p className="field-hint">按日期先后填写，首个日期为投稿日期。</p>
         {draft.stages.length ? <div className="submission-stage-rows">{draft.stages.map((stage, index) => <div className="submission-stage-row" key={stage.id ?? `new-${index}`}>
           <span className="submission-stage-number">{index + 1}</span>
           <label className="field">状态名称<input aria-label={`状态 ${index + 1} 名称`} value={stage.name} required maxLength={160} placeholder={index === 0 ? '例如 Submitted to Journal' : '例如 With editor'} onChange={(event) => patchStage(index, { name: event.target.value })} /></label>
@@ -75,15 +75,15 @@ export function SubmissionDialog({ submission, onClose }: { submission?: Submiss
           <div className="submission-stage-row-actions"><Button variant="ghost" className="icon-button" aria-label={`上移状态 ${index + 1}`} title="上移" disabled={index === 0} onClick={() => moveStage(index, -1)}><ArrowUp size={15} /></Button>
             <Button variant="ghost" className="icon-button" aria-label={`下移状态 ${index + 1}`} title="下移" disabled={index === draft.stages.length - 1} onClick={() => moveStage(index, 1)}><ArrowDown size={15} /></Button>
             <Button variant="ghost" className="icon-button danger-text" aria-label={`删除状态 ${index + 1}`} title="删除状态" onClick={() => patch({ stages: draft.stages.filter((_, own) => own !== index) })}><Trash2 size={15} /></Button></div>
-        </div>)}</div> : <p className="submission-stage-empty">尚未添加状态；保存后卡片会显示“暂无状态”。</p>}
+        </div>)}</div> : <p className="submission-stage-empty">暂无状态</p>}
         <Button className="submission-add-stage" disabled={draft.stages.length >= 30} onClick={() => patch({ stages: [...draft.stages, { name: '', occurredOn: draft.stages.at(-1)?.occurredOn ?? localDay() }] })}><Plus size={15} />添加状态</Button>
       </fieldset>
       <div className="submission-reminder-fields"><label className="field">返修截止日期<input aria-label="返修截止日期" type="date" value={draft.revisionDueDate ?? ''} onChange={(event) => patch({ revisionDueDate: event.target.value || null })} /></label>
         <div className="submission-reminder-options"><label><Bell size={15} /><span>返修提醒</span><input aria-label="启用返修提醒" type="checkbox" role="switch" checked={draft.reminderEnabled} onChange={(event) => patch({ reminderEnabled: event.target.checked })} /></label>
           <select aria-label="返修提前提醒天数" disabled={!draft.reminderEnabled} value={draft.reminderDays} onChange={(event) => patch({ reminderDays: Number(event.target.value) })}><option value={0}>截止当天</option><option value={1}>提前 1 天</option><option value={3}>提前 3 天</option><option value={7}>提前 7 天</option>{![0, 1, 3, 7].includes(draft.reminderDays) && <option value={draft.reminderDays}>提前 {draft.reminderDays} 天</option>}</select></div>
-        <p className="field-hint">有返修截止日期并开启提醒时生效。应用运行时发送系统通知，重新打开时补查；关闭期间不发送通知。</p></div>
-      <div className="submission-state-switches"><label><input type="checkbox" checked={draft.revisionCompleted ?? false} onChange={(event) => patch({ revisionCompleted: event.target.checked })} /><span><CheckCircle2 size={15} />本轮返修已完成<small>旧返修期限保留在历史中，但退出活动提醒和逾期统计。</small></span></label><label><input type="checkbox" checked={draft.ended ?? false} onChange={(event) => patch({ ended: event.target.checked })} /><span><CheckCircle2 size={15} />投稿已结束<small>由你明确确认，不根据阶段名称推断。</small></span></label></div>
-      <fieldset className="submission-review-editor"><legend>返修事项</legend><p className="field-hint">返修事项与关联任务双向同步完成状态；正文和材料链接保留在本投稿轮次。</p>
+        <p className="field-hint">应用运行时发送提醒。</p></div>
+      <div className="submission-state-switches"><label><input type="checkbox" checked={draft.revisionCompleted ?? false} onChange={(event) => patch({ revisionCompleted: event.target.checked })} /><span><CheckCircle2 size={15} />本轮返修已完成<small>停止本轮返修提醒</small></span></label><label><input type="checkbox" checked={draft.ended ?? false} onChange={(event) => patch({ ended: event.target.checked })} /><span><CheckCircle2 size={15} />投稿已结束</span></label></div>
+      <fieldset className="submission-review-editor"><legend>返修事项</legend><p className="field-hint">完成状态与关联任务同步。</p>
         {(draft.reviewItems ?? []).map((item, index) => <div className="submission-review-row" key={item.id}>
           <label><input aria-label={`返修事项 ${index + 1} 完成状态`} type="checkbox" checked={item.completed} onChange={async (event) => { const completed = event.target.checked; patchReview(item.id, { completed }); const linked = tasks.find((task) => task.id === item.taskId); if (linked && (linked.status === 'completed') !== completed) await useWorkbench.getState().completeTask(linked.id) }} /></label>
           <label className="field">审稿人<input maxLength={100} value={item.reviewer} placeholder="例如 Reviewer 2" onChange={(event) => patchReview(item.id, { reviewer: event.target.value })} /></label>

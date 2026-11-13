@@ -14,6 +14,7 @@ const env = {
   ...process.env,
   WORKBENCH_DATA_DIR: profile,
   WORKBENCH_DISABLE_ARXIV_AUTO: '1',
+  WORKBENCH_DISABLE_WIDGET_AUTO: '1',
   WORKBENCH_DISABLE_METADATA_AUTO: '1',
   WORKBENCH_DISABLE_ENCOURAGEMENT_AUTO: '1',
   WORKBENCH_DISABLE_NOTIFICATIONS: '1'
@@ -46,7 +47,7 @@ async function launch() {
     const window = BrowserWindow.getAllWindows()[0]
     window.setContentSize(1600, 940)
     window.webContents.setBackgroundThrottling(false)
-    window.showInactive()
+    window.hide()
   })
   await page.getByRole('heading', { name: '今日计划', exact: true }).waitFor()
 }
@@ -72,13 +73,13 @@ try {
 
   await page.getByTestId('paper-card').getByRole('button', { name: '中英摘要', exact: true }).click()
   const overview = page.getByRole('dialog', { name: '中英摘要' })
-  const sourceAbstract = overview.getByLabel('原文摘要', { exact: true })
+  const sourceAbstract = overview.getByLabel('粘贴原文摘要', { exact: true })
   await sourceAbstract.waitFor()
   await sourceAbstract.fill('This controlled abstract explains a research workflow for hyperspectral image reconstruction, translation progress, and persistent PDF highlights. The text is only test data and contains no private information.')
   await overview.getByRole('button', { name: '翻译摘要', exact: true }).click()
-  const progress = overview.getByRole('progressbar', { name: '标题与摘要翻译进度' })
+  const progress = overview.getByRole('status').filter({ hasText: '正在翻译标题与摘要' })
   await progress.waitFor()
-  assert.match(await overview.locator('.paper-overview-progress-heading').innerText(), /正在.+摘要|正在翻译/)
+  assert.match(await progress.innerText(), /正在翻译标题与摘要/)
   await screenshot('01-overview-progress.png')
   await overview.getByRole('heading', { name: '科研工作流翻译检查', exact: true }).waitFor()
   assert.equal(overviewRequests, 1)
@@ -94,9 +95,10 @@ try {
     const scroll = document.querySelector('.reader-scroll').getBoundingClientRect()
     const back = document.querySelector('.reader-back-button').getBoundingClientRect()
     const toolbar = document.querySelector('.reader-toolbar').getBoundingClientRect()
-    return { dialogWidth: dialog.width, scrollWidth: scroll.width, ratio: scroll.width / dialog.width, backWidth: back.width, backLeft: back.left - toolbar.left }
+    const notesWidth = document.querySelector('.reader-notes-panel').getBoundingClientRect().width
+    return { dialogWidth: dialog.width, scrollWidth: scroll.width, notesWidth, backWidth: back.width, backLeft: back.left - toolbar.left }
   })
-  assert.ok(readerGeometry.ratio > 0.65 && readerGeometry.ratio < 0.86, JSON.stringify(readerGeometry))
+  assert.ok(readerGeometry.notesWidth >= 185 && readerGeometry.notesWidth <= 236, JSON.stringify(readerGeometry))
   assert.ok(readerGeometry.backWidth < 180 && readerGeometry.backLeft < 30, JSON.stringify(readerGeometry))
   await page.locator('.textLayer').evaluate((layer) => {
     const span = Array.from(layer.querySelectorAll('span')).find((node) => /Research workflow translation check/i.test(node.textContent ?? ''))
@@ -130,9 +132,9 @@ try {
   assert.equal(categories.length, 4)
   assert.ok(categories.every((category, index) => category.left === categories[0].left && (!index || category.top >= categories[index - 1].bottom)))
   await page.getByRole('button', { name: '方法 1', exact: true }).click()
-  assert.equal(await page.locator('.reader-annotation').count(), 0)
+  await page.locator('.reader-annotation').waitFor({ state: 'detached' })
   await page.getByRole('button', { name: '方法 1', exact: true }).click()
-  assert.equal(await page.locator('.reader-annotation').count(), 1)
+  await page.locator('.reader-annotation').waitFor()
   await page.getByRole('button', { name: /跳到第 1 页批注/ }).click()
   const located = page.locator('.pdf-highlight.is-located').first()
   await located.waitFor()
@@ -178,22 +180,22 @@ try {
     const bay = getComputedStyle(document.querySelector('.dock-wrap'), '::before')
     return {
       viewportHeight: innerHeight, sidebarBottom: sidebar.bottom, mainBottom: main.bottom, dockBottom: dock.bottom,
-      dockOverlapsMain: dock.top < main.bottom, bayContent: bay.content,
+      dockInMain: document.querySelector('.dock-wrap').parentElement === document.querySelector('.main-region'), bayContent: bay.content,
       dockRadius: parseFloat(getComputedStyle(document.querySelector('.dock')).borderRadius),
       wallpaper: Array.from(document.querySelectorAll('.workspace-wallpaper')).map((element) => element.className).join(' ')
     }
   })
   assert.ok(Math.abs(shell.viewportHeight - shell.sidebarBottom) <= 14, JSON.stringify(shell))
   assert.ok(Math.abs(shell.viewportHeight - shell.mainBottom) <= 14, JSON.stringify(shell))
-  assert.ok(Math.abs(shell.viewportHeight - shell.dockBottom) <= 1, JSON.stringify(shell))
-  assert.equal(shell.dockOverlapsMain, true)
+  assert.ok(Math.abs(shell.mainBottom - shell.dockBottom) <= 2, JSON.stringify(shell))
+  assert.equal(shell.dockInMain, true)
   assert.equal(shell.bayContent, 'none')
-  assert.ok(shell.dockRadius > 100)
+  assert.equal(shell.dockRadius, 0)
   assert.match(shell.wallpaper, /wallpaper-klein/)
-  await screenshot('04-klein-dock-capsule.png')
+  await screenshot('04-klein-dock.png')
   await page.getByRole('button', { name: '极夜黑背景', exact: true }).click()
   await screenshot('05-midnight-background.png')
-  pass('Sidebar and main panel reach the bottom with a floating Dock capsule; dark backgrounds apply')
+  pass('Dock stays inside the main panel and follows the selected background')
 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)
   assert.equal(overflow, false)

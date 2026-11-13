@@ -108,7 +108,7 @@ export function PublicationDialog({ paper, seed, sourceSubmissionId, onClose }: 
     } catch { setError('无法选择 PDF，请重试。') } finally { setBusy(false) }
   }
   return <>
-    <Dialog open className="publication-dialog" title={paper ? '编辑科研成果' : '添加已发表成果'} description="可先填写 DOI 或发表信息，PDF 可以现在选择，也可以保存后再补充。"
+    <Dialog open className="publication-dialog" title={paper ? '编辑科研成果' : '添加已发表成果'} 
       onOpenChange={(open) => { if (!open) requestClose() }}>
       <form className="project-form" onSubmit={async (event) => {
         event.preventDefault(); if (busy || identifying) return
@@ -125,7 +125,7 @@ export function PublicationDialog({ paper, seed, sourceSubmissionId, onClose }: 
           onClose()
         } catch { setError('成果未能保存，请检查文件后重试。') } finally { setBusy(false) }
       }}>
-        <div className="publication-pdf-input"><FileText size={24} /><span><strong>{paper?.originalName || (path ? path.split(/[\\/]/).pop() : '尚未关联 PDF')}</strong><small>{paper?.sourcePath || path ? '原文件保留 · 副本保存在本机' : '可以只保存成果信息，稍后补充 PDF'}</small></span>
+        <div className="publication-pdf-input"><FileText size={24} /><span><strong>{paper?.originalName || (path ? path.split(/[\\/]/).pop() : '尚未关联 PDF')}</strong>{!paper?.sourcePath && !path && <small>可稍后补充 PDF</small>}</span>
           {(!paper || !paper.sourcePath) && <Button onClick={() => void pick()} disabled={busy}><Upload size={14} />{paper ? '补充 PDF' : path ? '重新选择' : '选择 PDF（可选）'}</Button>}</div>
         {((paper?.sourcePath) || path) && <div className={`publication-recognition ${identified?.status === 'partial' ? 'is-partial' : ''}`} role="status" aria-live="polite">
           <div>{identifying ? <span className="tiny-spinner" /> : <ScanText size={16} />}<span><strong>{identifying ? phase : identified ? identified.source : '文章资料自动识别'}</strong>
@@ -141,7 +141,7 @@ export function PublicationDialog({ paper, seed, sourceSubmissionId, onClose }: 
             setDatePrecision(precision); update('publishedDate', draft.publishedDate.length >= length ? draft.publishedDate.slice(0, length) : '')
           }}><option value="day">完整日期</option><option value="month">仅年月</option><option value="year">仅年份</option></select>
             <input id="publication-date" aria-label="发表时间" type={shownPrecision === 'year' ? 'text' : shownPrecision === 'month' ? 'month' : 'date'} inputMode={shownPrecision === 'year' ? 'numeric' : undefined} maxLength={shownPrecision === 'year' ? 4 : undefined} placeholder="例如 2024" required value={draft.publishedDate} onChange={(e) => update('publishedDate', e.target.value)} /></div></div></div>
-        <p className="field-hint publication-date-hint">只有年份或月份时，可按实际精度保存，无需补填具体月日。</p>
+        <p className="field-hint publication-date-hint">支持只填年份或年月。</p>
         <div className="field-pair"><label className="field">期刊分区<select aria-label="期刊分区" value={draft.casPartition} onChange={(e) => update('casPartition', e.target.value)}><option value="">暂未填写</option>{journalPartitions.map((value) => <option key={value}>{value}</option>)}</select></label>
           <label className="field">JCR 分区<select aria-label="JCR 分区" value={draft.jcrQuartile} onChange={(e) => update('jcrQuartile', e.target.value)}><option value="">暂未填写</option>{['Q1', 'Q2', 'Q3', 'Q4', '非SCI'].map((value) => <option key={value}>{value}</option>)}</select></label></div>
         <div className="field-pair"><label className="field">分区年份<input inputMode="numeric" maxLength={4} placeholder="例如 2026" value={draft.partitionYear ?? ''} onChange={(e) => setDraft((current) => ({ ...current, partitionYear: e.target.value }))} /></label>
@@ -154,7 +154,7 @@ export function PublicationDialog({ paper, seed, sourceSubmissionId, onClose }: 
               ...previous, honors: selected ? previous.honors.filter((honor) => honor !== id) : [...previous.honors, id]
             }))}><Icon size={15} />{label}</button>
           })}</div>
-          <p className="field-hint">荣誉信息由你确认，不根据期刊或引用数据自动推断。</p>
+          
         </fieldset>
         <label className="field">DOI<input maxLength={500} placeholder="10.xxxx/… 或 DOI 链接，可留空" value={draft.doi} onChange={(e) => update('doi', e.target.value)} /></label>
         <label className="field">主题标签<input maxLength={1000} placeholder="多个标签用逗号分隔" value={(draft.tags ?? []).join(', ')} onChange={(e) => setDraft((current) => ({ ...current, tags: e.target.value.split(/[,，]/).map((value) => value.trim()).filter(Boolean).slice(0, 30) }))} /></label>

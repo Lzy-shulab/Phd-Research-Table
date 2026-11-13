@@ -21,6 +21,6 @@ export function OutputsSidebar() {
       {journals.map((journal) => <button key={journal} className={cn('sidebar-link', outputJournal === journal && 'output-selected')} aria-pressed={outputJournal === journal}
         onClick={() => filterOutputs(outputYear, outputJournal === journal ? 'all' : journal)} title={journal}><span className="truncate">{journal}</span><small className="nav-count">{publications.filter((p) => p.journal === journal).length}</small></button>)}
     </nav>
-    <p className="sidebar-note">记录已经发表的研究。添加成果后，年份和期刊会自动出现在这里。</p>
+    
   </>
 }

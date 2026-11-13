@@ -1,5 +1,4 @@
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdtempSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -14,6 +13,8 @@ import { TranslationProfileStore, type SecretProtector } from '../src/main/libra
 import { applyTranslationProfileConfig, translatorExecutable } from '../src/main/library/translator'
 
 const resources: { directory: string; connection: DatabaseConnection }[] = []
+const testRoot = resolve('test-results/translation-profiles')
+mkdirSync(testRoot, { recursive: true })
 const protector: SecretProtector = {
   available: () => true,
   encrypt: (value) => Buffer.from(`protected:${value}`).toString('base64'),
@@ -21,7 +22,7 @@ const protector: SecretProtector = {
 }
 
 function setup() {
-  const directory = mkdtempSync(join(tmpdir(), 'translation-profiles-'))
+  const directory = mkdtempSync(join(testRoot, 'case-'))
   const connection = openDatabase(join(directory, 'workbench.sqlite'), resolve('src/main/database/migrations'))
   resources.push({ directory, connection })
   return { connection, store: new TranslationProfileStore(new LibraryRepository(connection.db), protector) }
@@ -29,20 +30,29 @@ function setup() {
 
 afterEach(() => {
   for (const resource of resources.splice(0)) {
-    resource.connection.close(); rmSync(resource.directory, { recursive: true, force: true })
+    resource.connection.close()
   }
 })
 
 describe('Translation API profiles', () => {
-  it('starts with four presets and defaults to SiliconFlow Qwen until the user adds a key', () => {
+  it('includes local Codex alongside the API presets and preserves the existing default', () => {
     const { store } = setup()
     const snapshot = store.snapshot()
     expect(snapshot.activeId).toBe('siliconflow-api')
-    expect(snapshot.profiles).toHaveLength(4)
+    expect(snapshot.profiles).toHaveLength(5)
+    expect(snapshot.profiles.find(profile => profile.id === 'codex-cli')).toMatchObject({ ready: true, hasApiKey: false })
     expect(snapshot.profiles.find((profile) => profile.id === 'pdf2zh-free')).toMatchObject({ ready: true, hasApiKey: false })
     expect(snapshot.profiles.find((profile) => profile.id === 'siliconflow-api')).toMatchObject({ model: 'Qwen/Qwen3-8B', baseUrl: 'https://api.siliconflow.cn/v1', ready: false })
     expect(snapshot.profiles.find((profile) => profile.id === 'gemini-flash-lite')).toMatchObject({ model: 'gemini-2.5-flash-lite', ready: false })
     expect(() => store.activate('gemini-flash-lite')).toThrow('补全')
+  })
+  it('saves the selected Codex model and reasoning effort without requiring an API key', () => {
+    const { store } = setup()
+    store.save({ id: 'codex-cli', name: 'Codex', provider: 'codex-cli', model: 'my-cli-model', baseUrl: '', reasoningEffort: 'high' })
+    store.activate('codex-cli')
+    expect(store.runtimeActive()).toMatchObject({ provider: 'codex-cli', model: 'my-cli-model', reasoningEffort: 'high', apiKey: '' })
+    store.save({ id: 'codex-cli', name: 'Codex', provider: 'codex-cli', model: '', baseUrl: '', reasoningEffort: 'default' })
+    expect(store.runtimeActive()).toMatchObject({ model: '', reasoningEffort: 'default' })
   })
 
   it('completes and activates the built-in Gemini Flash-Lite profile without exposing its key', () => {
@@ -150,6 +160,15 @@ openai_compatible_api_key = "old-compatible-secret"
     expect(output).toContain('gemini = false')
     expect(output).not.toMatch(/api_key\s*=\s*"(?!null)/)
   })
+  it('routes Codex through the job bridge with the timeout type required by PDF2zh', () => {
+    const bundled = readFileSync(resolve('resources/pdf2zh-config.toml.example'), 'utf8')
+    const output = applyTranslationProfileConfig(bundled, { id: 'codex-cli', name: 'CLI', provider: 'codex-cli',
+      model: 'codex-cli:chosen:high', reasoningEffort: 'high', baseUrl: 'http://127.0.0.1:12345/v1', apiKey: 'job-token' })
+    expect(output).toContain('openaicompatible = true')
+    expect(output).toContain('openai_compatible_timeout = "360"')
+    expect(output).toMatch(/^qps = 48$/m)
+    expect(output).toMatch(/^term_qps = 48$/m)
+  })
 
   it('sends the non-thinking switch for Qwen3 hybrid translation while keeping cache enabled', () => {
     const inherited = template.replace('qps = 4', 'qps = 4\nignore_cache = true') + '\n'
@@ -179,15 +198,15 @@ openai_compatible_api_key = "old-compatible-secret"
   })
 
   it('recognizes both the legacy virtual environment and the official portable Windows layout', () => {
-    const directory = mkdtempSync(join(tmpdir(), 'translation-layout-'))
+    const directory = mkdtempSync(join(testRoot, 'layout-'))
     try {
       const portable = join(directory, 'pdf2zh'); mkdirSync(portable)
       writeFileSync(join(portable, 'pdf2zh_next.exe'), 'portable')
       expect(translatorExecutable(directory)).toBe(join(portable, 'pdf2zh_next.exe'))
-      rmSync(portable, { recursive: true, force: true })
+      renameSync(portable, join(directory, 'portable-before-legacy'))
       const scripts = join(directory, 'zotero-pdf2zh-next-venv', 'Scripts'); mkdirSync(scripts, { recursive: true })
       writeFileSync(join(scripts, 'pdf2zh_next.exe'), 'legacy')
       expect(translatorExecutable(directory)).toBe(join(scripts, 'pdf2zh_next.exe'))
-    } finally { rmSync(directory, { recursive: true, force: true }) }
+    } finally { /* Test artifacts are archived with the release batch. */ }
   })
 })

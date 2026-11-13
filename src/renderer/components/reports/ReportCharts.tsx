@@ -79,7 +79,8 @@ export function ReportBars({ buckets, series, format = String }: {
         <ChartHover label={bucket.title} lines={[...bucket.values.map((value, i) => `${series[i]}：${format(value)}`), ...(bucket.details ?? [])]}>
           <div className="report-chart-group">{bucket.values.map((value, index) => <div className="report-bar-slot" key={index}>
             <small style={{ bottom: `calc(${value / scale * 100}% + 4px)` }}>{value ? format(value) : ''}</small>
-            <motion.span initial={{ scaleY: reduced ? 1 : 0 }} animate={{ scaleY: 1 }} transition={{ duration: reduced ? 0.08 : 0.3 }} className={`report-bar series-${index}`} style={{ height: `${value / scale * 100}%`, transformOrigin: 'bottom' }} />
+            <motion.span initial={reduced ? false : { scaleY: 0 }} animate={{ scaleY: value / scale }}
+              transition={{ duration: reduced ? 0 : 0.27, ease: 'easeOut' }} className={`report-bar series-${index}`} style={{ height: '100%', transformOrigin: 'bottom' }} />
           </div>)}</div><span className="report-chart-label">{bucket.label}</span>
         </ChartHover>
       </div>)}

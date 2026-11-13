@@ -15,7 +15,7 @@ const reviewItem = z.object({
   materialLink: z.string().trim().max(2000),
   taskId: z.uuid().nullable()
 }).strict()
-export const submissionSchema = z.object({
+const submissionFields = z.object({
   title: z.string().trim().min(1, '请填写论文标题。').max(1000),
   journal: z.string().trim().min(1, '请填写投稿期刊或会议。').max(500),
   manuscriptId: z.string().trim().max(200),
@@ -31,7 +31,12 @@ export const submissionSchema = z.object({
   manuscriptGroupId: z.uuid().optional(),
   sourceSubmissionId: z.uuid().nullable().optional(),
   reviewItems: z.array(reviewItem).max(100).optional()
-}).strict().superRefine((input, context) => {
+}).strict()
+export const submissionProgressPatchSchema = submissionFields.pick({
+  title: true, journal: true, manuscriptId: true, stages: true, revisionDueDate: true,
+  reminderEnabled: true, reminderDays: true, notes: true, revisionCompleted: true, ended: true
+}).partial()
+export const submissionSchema = submissionFields.superRefine((input, context) => {
   const ids = input.stages.flatMap((item) => item.id ? [item.id] : [])
   if (new Set(ids).size !== ids.length)
     context.addIssue({ code: 'custom', path: ['stages'], message: '投稿状态记录不能重复。' })

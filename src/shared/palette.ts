@@ -20,28 +20,32 @@ export function hslHex(hue: number, saturation: number, lightness: number) {
 export function interfacePalette(style: BackgroundStyle, dark: boolean, custom?: [number, number]) {
   const [hue, saturation] = custom ?? seeds[style]
   const color = (light: number, strength = 1) => hslHex(hue, saturation * strength, light)
-  const base = color(dark ? 13 : 91)
-  const solid = color(dark ? 19 : 98, 0.7)
-  const secondary = color(dark ? 24 : 92, 0.75)
+  const surface = (light: number, strength = 1) => hslHex(hue, Math.min(19, saturation) * strength, light)
+  const base = surface(dark ? 13 : 93)
+  const solid = surface(dark ? 19 : 98, 0.7)
+  const secondary = surface(dark ? 24 : 94, 0.75)
   const text = color(dark ? 94 : 16, 0.45)
-  const accent = color(dark ? 78 : 32, 1.35)
+  const accent = hslHex(hue, Math.min(46, saturation * 1.35), dark ? 78 : 32)
   const companionHue = custom ? (hue + 58) % 360 : companionHues[style]
   const companion = (light: number) => hslHex(companionHue, Math.min(42, saturation + 12), light)
   const warm = (light: number) => hslHex(style === 'yellow' ? 29 : 35, 38, light)
   const positive = (light: number) => hslHex(153, 27, light)
+  const danger = (light: number) => hslHex(354, 39, light)
   return {
     base, text,
     variables: {
       '--app-background': base, '--chrome-color': base,
       '--surface-primary': solid, '--surface-solid': solid, '--surface-secondary': secondary,
-      '--surface-workspace': color(dark ? 16 : 95, 0.8),
-      '--surface-raised': color(dark ? 23 : 99, 0.75), '--surface-inset': color(dark ? 13 : 91, 0.85),
-      '--surface-hover': color(dark ? 28 : 88, 0.75),
-      '--surface-feature': color(dark ? 22 : 97, 1),
+      '--surface-workspace': surface(dark ? 16 : 96, 0.8),
+      '--surface-raised': surface(dark ? 23 : 99, 0.75), '--surface-inset': surface(dark ? 13 : 92, 0.85),
+      '--surface-hover': surface(dark ? 28 : 89, 0.75),
+      '--surface-feature': surface(dark ? 22 : 97),
       '--surface-companion': companion(dark ? 21 : 97), '--surface-warm': warm(dark ? 21 : 97),
       '--action-companion': companion(dark ? 79 : 30), '--on-companion': companion(dark ? 13 : 99),
       '--action-warm': warm(dark ? 79 : 31), '--on-warm': warm(dark ? 13 : 99),
       '--action-positive': positive(dark ? 79 : 30), '--on-positive': positive(dark ? 13 : 99),
+      '--success': positive(dark ? 79 : 30), '--warning': warm(dark ? 79 : 31), '--submission-warning': warm(dark ? 79 : 31),
+      '--danger': danger(dark ? 77 : 40), '--danger-subtle': danger(dark ? 22 : 95),
       '--companion-soft': companion(dark ? 79 : 30) + '1c',
       '--warm-soft': warm(dark ? 79 : 31) + '1c', '--positive-soft': positive(dark ? 79 : 30) + '1c',
       '--glass-highlight': color(dark ? 90 : 100, 0.35) + (dark ? '30' : 'b8'),
@@ -51,7 +55,7 @@ export function interfacePalette(style: BackgroundStyle, dark: boolean, custom?:
       '--glass-floating': solid + 'f2', '--glass-card': solid + 'f2',
       '--text-primary': text, '--text-secondary': color(dark ? 78 : 35, 0.45),
       '--text-muted': color(dark ? 71 : 37, 0.4), '--accent': accent,
-      '--accent-hover': color(dark ? 86 : 26, 1.2), '--accent-soft': accent + '22',
+      '--accent-hover': hslHex(hue, Math.min(46, saturation * 1.2), dark ? 86 : 26), '--accent-soft': accent + '22',
       '--on-accent': color(dark ? 14 : 99, 0.4),
       '--border-default': color(dark ? 75 : 35, 0.4) + '38',
       '--border-subtle': color(dark ? 75 : 35, 0.4) + '1a',

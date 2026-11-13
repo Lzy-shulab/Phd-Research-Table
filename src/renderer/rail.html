@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:"><title>PhD 桌面便签</title></head>
+<body><nav aria-label="桌面便签">
+<div id="rail-shortcuts">
+<button data-panel="checkin" aria-label="打卡记录"><span class="rail-symbol"><svg class="dual-orbit" viewBox="0 0 48 48" aria-hidden="true"><circle class="orbit-track" cx="24" cy="24" r="21"/><circle class="orbit-track" cx="24" cy="24" r="14"/><circle id="month-orbit" cx="24" cy="24" r="21" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100"/><circle id="week-orbit" cx="24" cy="24" r="14" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100"/></svg></span><span class="rail-copy"><span>打卡记录</span><span class="rail-detail" aria-hidden="true"><span id="week-value">—</span><span id="month-value">—</span></span></span></button>
+<button data-panel="tasks" aria-label="任务总览"><span class="rail-symbol" data-icon="ListChecks"></span><span class="rail-copy"><span>任务总览</span><span class="rail-detail" id="task-status" aria-hidden="true">—</span></span></button>
+<button data-panel="submissions" aria-label="论文投稿"><span class="rail-symbol" data-icon="PaperPlaneTilt"></span><span class="rail-copy"><span>论文投稿</span><span class="rail-detail" id="submission-status" aria-hidden="true">—</span></span></button>
+<button data-panel="reading" aria-label="论文阅读" title="点击查看论文，或拖入 PDF"><span class="rail-symbol rail-reading-icon" data-icon="BookOpenText"></span><span class="rail-copy"><span>论文阅读</span><span class="rail-detail" id="reading-status" aria-hidden="true">—</span></span><svg class="rail-progress" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="17"/><circle id="reading-progress" cx="20" cy="20" r="17" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100"/></svg></button>
+<button data-panel="gpu" aria-label="GPU 监控"><span class="rail-symbol"><svg width="28" height="28" fill="currentColor" viewBox="0 0 256 256" aria-hidden="true"><path d="M200,48H56a8,8,0,0,0-8,8V200a8,8,0,0,0,8,8H200a8,8,0,0,0,8-8V56A8,8,0,0,0,200,48ZM152,152H104V104h48Z" opacity=".2"/><path d="M152,96H104a8,8,0,0,0-8,8v48a8,8,0,0,0,8,8h48a8,8,0,0,0,8-8V104A8,8,0,0,0,152,96Zm-8,48H112V112h32Zm88,0H216V112h16a8,8,0,0,0,0-16H216V56a16,16,0,0,0-16-16H160V24a8,8,0,0,0-16,0V40H112V24a8,8,0,0,0-16,0V40H56A16,16,0,0,0,40,56V96H24a8,8,0,0,0,0,16H40v32H24a8,8,0,0,0,0,16H40v40a16,16,0,0,0,16,16H96v16a8,8,0,0,0,16,0V216h32v16a8,8,0,0,0,16,0V216h40a16,16,0,0,0,16-16V160h16a8,8,0,0,0,0-16Zm-32,56H56V56H200v95.87s0,.09,0,.13,0,.09,0,.13V200Z"/></svg></span><span class="rail-copy"><span>GPU 监控</span><span class="rail-detail" id="gpu-status" aria-hidden="true">连接中</span></span></button>
+<button data-panel="codex" aria-label="Codex 额度"><span class="rail-symbol"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="currentColor" viewBox="0 0 256 256" aria-hidden="true"><path d="M232,152v24a8,8,0,0,1-8,8H32a8,8,0,0,1-8-8V153.13C24,95.65,70.15,48.2,127.63,48A104,104,0,0,1,232,152Z" opacity="0.2"></path><path d="M207.06,72.67A111.24,111.24,0,0,0,128,40h-.4C66.07,40.21,16,91,16,153.13V176a16,16,0,0,0,16,16H224a16,16,0,0,0,16-16V152A111.25,111.25,0,0,0,207.06,72.67ZM224,176H119.71l54.76-75.3a8,8,0,0,0-12.94-9.42L99.92,176H32V153.13c0-3.08.15-6.12.43-9.13H56a8,8,0,0,0,0-16H35.27c10.32-38.86,44-68.24,84.73-71.66V80a8,8,0,0,0,16,0V56.33A96.14,96.14,0,0,1,221,128H200a8,8,0,0,0,0,16h23.67c.21,2.65.33,5.31.33,8Z"></path></svg></span><span class="rail-copy"><span>Codex 额度</span><span class="rail-detail" id="codex-status" aria-hidden="true">读取中</span></span></button>
+</div>
+<button id="workbench" aria-label="打开 PhD 工作台"><span class="rail-symbol rail-launch-symbol"><svg width="28" height="28" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M112,56v48a8,8,0,0,1-8,8H56a8,8,0,0,1-8-8V56a8,8,0,0,1,8-8h48A8,8,0,0,1,112,56Zm88-8H152a8,8,0,0,0-8,8v48a8,8,0,0,0,8,8h48a8,8,0,0,0,8-8V56A8,8,0,0,0,200,48Zm-96,96H56a8,8,0,0,0-8,8v48a8,8,0,0,0,8,8h48a8,8,0,0,0,8-8V152A8,8,0,0,0,104,144Zm96,0H152a8,8,0,0,0-8,8v48a8,8,0,0,0,8,8h48a8,8,0,0,0,8-8V152A8,8,0,0,0,200,144Z" opacity=".2"/><path d="M200,136H152a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V152A16,16,0,0,0,200,136Zm0,64H152V152h48v48ZM104,40H56A16,16,0,0,0,40,56v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V56A16,16,0,0,0,104,40Zm0,64H56V56h48v48Zm96-64H152a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V56A16,16,0,0,0,200,40Zm0,64H152V56h48v48Zm-96,32H56a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V152A16,16,0,0,0,104,136Zm0,64H56V152h48v48Z"/></svg></span><span class="rail-copy">PhD 工作台</span></button>
+</nav>
+<template id="rail-water-template">
+  <section class="rail-water" aria-label="喝水提醒" hidden>
+    <svg class="rail-water-glass" viewBox="0 0 44 44" aria-hidden="true">
+      <defs><clipPath id="rail-water-cup"><path d="M10 11h24l-3 24a3 3 0 0 1-3 2H16a3 3 0 0 1-3-2z"/></clipPath></defs>
+      <g class="rail-water-cup">
+        <g clip-path="url(#rail-water-cup)"><path class="rail-water-fill" fill="currentColor" d="M6 22c6 0 9-4 16-2 7 2 10 0 16-1v22H6z"/></g>
+        <path d="M10 11h24l-3 24a3 3 0 0 1-3 2H16a3 3 0 0 1-3-2z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+      </g>
+      <path class="rail-water-check" d="m13 23 6 6 12-13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <div class="rail-water-copy" role="status"><strong>该喝水了</strong><span hidden></span></div>
+    <button type="button" class="rail-water-action">已喝</button>
+  </section>
+</template>
+<template id="rail-notice-template">
+  <section class="rail-notice" aria-label="桌面提醒" hidden>
+    <svg class="rail-notice-icon" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path class="rail-notice-glyph"/>
+      <path class="rail-notice-check" d="m7 16 6 6 12-12" pathLength="1"/>
+    </svg>
+    <div class="rail-notice-copy" role="status"><strong></strong><span></span></div>
+    <button type="button" class="rail-notice-action">知道了</button>
+  </section>
+</template>
+<p class="rail-alert" role="alert"></p><script type="module" src="/widget/rail.ts"></script></body></html>

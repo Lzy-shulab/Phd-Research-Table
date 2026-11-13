@@ -3,6 +3,8 @@
 import asyncio
 import json
 import logging
+from pathlib import Path
+import site
 import sys
 
 
@@ -14,6 +16,12 @@ def emit(stage, percent=None, current=None, total=None):
 
 async def main():
     emit("Preparing translation engine")
+    engine_root = None
+    if sys.argv[1:2] == ["--portable-engine-root"]:
+        engine_root = Path(sys.argv[2])
+        del sys.argv[1:3]
+        site.addsitedir(str(engine_root / "site-packages"))
+
     from pdf2zh_next.config import ConfigManager
     from pdf2zh_next.high_level import do_translate_async_stream
     import babeldoc.assets.assets
@@ -26,6 +34,8 @@ async def main():
         raise RuntimeError("Exactly one source PDF is required")
     settings.basic.input_files = set()
     emit("Preparing translation resources")
+    if engine_root and any(engine_root.glob("offline_assets_*.zip")):
+        babeldoc.assets.assets.restore_offline_assets_package(engine_root)
     babeldoc.assets.assets.warmup()
     finished = False
     async for event in do_translate_async_stream(settings, files[0]):

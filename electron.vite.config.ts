@@ -31,6 +31,6 @@ export default defineConfig({
       }
     ],
     server: { host: '127.0.0.1' },
-    build: { minify: true, rollupOptions: { input: resolve('src/renderer/index.html') } }
+    build: { minify: true, rollupOptions: { input: { main: resolve('src/renderer/index.html'), widget: resolve('src/renderer/widget.html'), rail: resolve('src/renderer/rail.html') } } }
   }
 })

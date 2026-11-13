@@ -1,4 +1,4 @@
-import { LockKeyhole, PanelLeft } from 'lucide-react'
+import { PanelLeft } from 'lucide-react'
 import { useWorkbench } from '../../stores/workbench'
 import { DailyEncouragement } from './DailyEncouragement'
 import { version } from '../../../../package.json'
@@ -31,12 +31,7 @@ export function Titlebar() {
           >
             任务尚未保存 · 查看修改
           </button>
-        ) : (
-          <>
-            <LockKeyhole size={11} />
-            <span>本地工作区</span>
-          </>
-        )}
+        ) : null}
       </div>
     </header>
   )

@@ -12,5 +12,5 @@ export function SubmissionsSidebar() {
   ]
   return <><nav className="planner-nav" aria-label="当前投稿状态筛选">{items.map((item) => <button key={item.id ?? 'all'} className={cn('sidebar-link', scope === item.id && 'selected')} aria-current={scope === item.id ? 'page' : undefined} onClick={() => setScope(item.id)}>
     {scope === item.id && <motion.span className="nav-selection" layoutId="submission-scope" />}<item.icon size={16} strokeWidth={1.6} /><span>{item.label}</span><small className="nav-count">{item.count}</small>
-  </button>)}</nav><p className="sidebar-note">状态名称由你按期刊系统填写；转投其他期刊时新建一条记录，保留上一轮经历。</p></>
+  </button>)}</nav></>
 }

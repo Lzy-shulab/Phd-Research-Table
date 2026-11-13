@@ -9,7 +9,7 @@ export type ReadingStatus = 'unread' | 'reading' | 'done'
 export type TaskRecurrence = 'weekly'
 export type Appearance = 'system' | 'light' | 'dark'
 export type PublicationHonor = (typeof publicationHonors)[number]
-export type Section = 'planner' | 'literature' | 'outputs' | 'submissions' | 'reports' | 'settings'
+export type Section = 'planner' | 'literature' | 'outputs' | 'submissions' | 'reports' | 'codex' | 'settings'
 export type PlannerView =
   'inbox' | 'today' | 'upcoming' | 'calendar' | 'all' | 'completed' | 'project' | 'projects'
 export type ProjectTaskAction = 'delete' | 'retain' | 'transfer'
@@ -35,6 +35,7 @@ export interface Task {
   scheduledDate: string | null
   startTime: string | null
   endTime: string | null
+  reminderMinutes: number | null
   estimatedMinutes: number | null
   deferredUntil: string | null
   seriesId: string | null
@@ -57,8 +58,9 @@ export interface TaskChecklistItem {
   text: string
   completed: boolean
 }
+export type DesktopTaskDraft = Pick<Task, 'title' | 'projectId' | 'scheduledDate' | 'startTime' | 'endTime' | 'reminderMinutes'>
 export type TaskCreate = Pick<Task, 'title'> &
-  Partial<Pick<Task, 'projectId' | 'scheduledDate' | 'startTime' | 'endTime' | 'description' | 'priority' | 'dueDate' | 'estimatedMinutes' | 'checklist' | 'milestone' | 'linkedPaperId' | 'linkedSubmissionId' | 'sourceType' | 'sourceId'>>
+  Partial<Pick<Task, 'projectId' | 'scheduledDate' | 'startTime' | 'endTime' | 'reminderMinutes' | 'description' | 'priority' | 'dueDate' | 'estimatedMinutes' | 'checklist' | 'milestone' | 'linkedPaperId' | 'linkedSubmissionId' | 'sourceType' | 'sourceId'>>
 export type TaskPatch = Partial<
   Pick<
     Task,
@@ -70,6 +72,7 @@ export type TaskPatch = Partial<
     | 'scheduledDate'
     | 'startTime'
     | 'endTime'
+    | 'reminderMinutes'
     | 'estimatedMinutes'
     | 'deferredUntil'
     | 'checklist'
@@ -104,9 +107,54 @@ export type ErrorCode = 'VALIDATION' | 'NOT_FOUND' | 'DATABASE' | 'UNAVAILABLE' 
 export type Result<T> =
   { ok: true; data: T } | { ok: false; error: { code: ErrorCode; message: string } }
 export interface WorkbenchApi {
+  openDesktopPanel: (panel: import('./widget').DesktopPanel) => Promise<Result<void>>
+  acknowledgeDesktopNotice: (id: string) => Promise<Result<import('./widget').WidgetSnapshot>>
+  recognizeDesktopTask: (input: string, preferredProject?: string) => Promise<Result<DesktopTaskDraft>>
+  setDesktopRailInteractive: (interactive: boolean) => Promise<Result<void>>
+  desktopPanelReady: () => Promise<Result<void>>
+  codexUsage: (force?: boolean) => Promise<Result<import('./codex-usage').CodexUsageSnapshot>>
+  onCodexUsageChanged: (handler: (snapshot: import('./codex-usage').CodexUsageSnapshot) => void) => () => void
+  gpuMonitor: (force?: boolean) => Promise<Result<import('./gpu').GpuMonitorSnapshot>>
+  saveGpuLogin: (credentials: { username: string; password: string }) => Promise<Result<import('./gpu').GpuMonitorSnapshot>>
+  forgetGpuLogin: () => Promise<Result<import('./gpu').GpuMonitorSnapshot>>
+  syncCpolarSsh: () => Promise<Result<import('./gpu').GpuMonitorSnapshot>>
+  setGpuAlerts: (enabled: boolean) => Promise<Result<import('./gpu').GpuMonitorSnapshot>>
+  setGpuOwners: (deviceId: string, names: string[]) => Promise<Result<import('./gpu').GpuMonitorSnapshot>>
+  onGpuMonitorChanged: (handler: (snapshot: import('./gpu').GpuMonitorSnapshot) => void) => () => void
+  openGpuWebsite: () => Promise<Result<void>>
+  copyGpuTunnel: (id: string) => Promise<Result<void>>
+  openGpuTunnel: (id: string) => Promise<Result<void>>
+  returnToDesktop: () => Promise<Result<void>>
+  workbenchReady: () => void
+  onWorkbenchShown: (handler: () => void) => () => void
+  desktopLibrary: () => Promise<Result<import('./widget').DesktopLibrarySnapshot>>
+  desktopReadingStatus: () => Promise<Result<import('./widget').DesktopReadingStatus>>
+  desktopOverview: () => Promise<Result<import('./widget').DesktopOverview>>
+  onDesktopOverviewChanged: (handler: () => void) => () => void
+  importDesktopPapers: (paths: string[], folderId: string | null) => Promise<Result<ImportReport & { translationMessage: string }>>
+  pickDesktopPapers: (folderId: string | null) => Promise<Result<ImportReport & { translationMessage: string }>>
+  openDesktopPaper: (id: string, variant: PaperVariant) => Promise<Result<void>>
+  onOpenDesktopPaper: (handler: (paper: { id: string; variant: PaperVariant }) => void) => () => void
+  onDesktopPanelShown: (handler: () => void) => () => void
+  setRevisionCompleted: (id: string, completed: boolean) => Promise<Result<Submission>>
+  updateSubmissionProgress: (id: string, patch: SubmissionProgressPatch) => Promise<Result<Submission>>
+  desktopTasks: () => Promise<Result<Pick<Snapshot, 'tasks' | 'projects'>>>
+  onTasksChanged: (handler: () => void) => () => void
+  widgetSnapshot: () => Promise<Result<import('./widget').WidgetSnapshot>>
+  updateWaterReminder: (action: 'restart' | 'stop') => Promise<Result<import('./widget').WidgetSnapshot>>
+  updateWidgetPreferences: (patch: import('./widget').WidgetPreferencesPatch) => Promise<Result<import('./widget').WidgetSnapshot>>
+  showWidget: () => Promise<Result<import('./widget').WidgetSnapshot>>
+  hideWidget: () => Promise<Result<void>>
+  openWorkbench: () => Promise<Result<void>>
+  setWidgetCompact: (compact: boolean) => Promise<Result<void>>
+  widgetWeather: (force?: boolean) => Promise<Result<import('./widget').WidgetWeatherSnapshot>>
+  searchWidgetCities: (query: string) => Promise<Result<import('./widget').WidgetCity[]>>
+  onWidgetChanged: (handler: (snapshot: import('./widget').WidgetSnapshot) => void) => () => void
+  onReportsChanged: (handler: () => void) => () => void
   saveCheckinAbsence: (input: import('./reports').CheckinAbsenceInput, id?: string) => Promise<Result<import('./reports').CheckinAbsenceEntry>>
   deleteCheckinAbsence: (id: string) => Promise<Result<void>>
   saveCheckin: (input: import('./reports').CheckinInput, id?: string) => Promise<Result<import('./reports').CheckinEntry>>
+  startCheckin: (input: import('./reports').CheckinStart) => Promise<Result<import('./reports').CheckinEntry>>
   deleteCheckin: (id: string) => Promise<Result<void>>
   researchReport: () => Promise<Result<import('./reports').ReportSnapshot>>
   saveReportSettings: (input: import('./reports').ReportSettings) => Promise<Result<void>>
@@ -150,6 +198,16 @@ export interface WorkbenchApi {
   revealStorageDirectory: (kind: PaperCollection | 'database') => Promise<Result<void>>
   saveArxivSettings: (settings: ArxivSettings) => Promise<Result<void>>
   runArxivDaily: () => Promise<Result<void>>
+  runPaperDaily: () => Promise<Result<void>>
+  cancelPaperDaily: () => Promise<Result<void>>
+  paperDailyAction: (id: string, action: 'favorite' | 'ignore' | 'open' | 'download') => Promise<Result<void>>
+  refreshJournalAbbreviations: () => Promise<Result<void>>
+  workbenchCodexModels: () => Promise<Result<import('./workbench-codex').WorkbenchCodexModel[]>>
+  sendWorkbenchCodex: (input: import('./workbench-codex').WorkbenchCodexInput) => Promise<Result<{ interrupted: boolean }>>
+  interruptWorkbenchCodex: () => Promise<Result<void>>
+  resetWorkbenchCodex: () => Promise<Result<void>>
+  copyWorkbenchCodexReply: (text: string) => Promise<Result<void>>
+  onWorkbenchCodexEvent: (handler: (event: import('./workbench-codex').WorkbenchCodexEvent) => void) => () => void
   cancelArxivDaily: () => Promise<Result<void>>
   revealArxivDirectory: () => Promise<Result<void>>
   pickPublicationPdf: () => Promise<Result<string | null>>
@@ -160,7 +218,7 @@ export interface WorkbenchApi {
   exportPublications: (format: 'bibtex' | 'csv', ids?: string[]) => Promise<Result<boolean>>
   librarySnapshot: () => Promise<Result<LibrarySnapshot>>
   onLibraryChanged: (handler: () => void) => () => void
-  onTranslationProgress: (handler: (progress: TranslationProgress | null) => void) => () => void
+  onTranslationProgress: (handler: (progress: TranslationProgress | null, active: TranslationProgress[]) => void) => () => void
   createFolder: (input: FolderInput) => Promise<Result<LibraryFolder>>
   updateFolder: (id: string, input: FolderInput) => Promise<Result<LibraryFolder>>
   deleteFolder: (id: string) => Promise<Result<void>>
@@ -176,6 +234,10 @@ export interface WorkbenchApi {
   readPaper: (id: string, variant: PaperVariant) => Promise<Result<Uint8Array>>
   exportPaper: (id: string, variant: PaperVariant) => Promise<Result<boolean>>
   translationHealth: () => Promise<Result<TranslationHealth>>
+  codexTranslationStatus: () => Promise<Result<import('./translation').CodexTranslationStatus>>
+  openJournalRankConsole: () => Promise<Result<void>>
+  saveJournalRankSettings: (input: { secretKey?: string; enabled: boolean; clearKey?: boolean }) => Promise<Result<import('./journal-ranks').JournalRanksSnapshot>>
+  refreshJournalRanks: (journals: string[], force?: boolean) => Promise<Result<import('./journal-ranks').JournalRanksSnapshot>>
   installTranslationEngine: () => Promise<Result<TranslationHealth>>
   cancelTranslationEngineInstall: () => Promise<Result<void>>
   translationProfiles: () => Promise<Result<import('./translation').TranslationProfilesSnapshot>>
@@ -214,6 +276,8 @@ export interface LibraryFolder {
 export type FolderInput = Pick<LibraryFolder, 'name' | 'parentId'>
 export type TranslationStatus = 'idle' | 'queued' | 'translating' | 'ready' | 'failed' | 'interrupted'
 export interface TranslationProgress {
+  rateWindow?: import('./translation-metrics').TranslationRateWindow
+  step?: import('./translation-progress').TranslationStep
   paperId: string
   stage: string
   percent: number | null
@@ -324,7 +388,11 @@ export interface PaperHighlight {
 }
 export type PaperPatch = Partial<Pick<Paper, 'folderId' | 'title' | 'authors' | 'journal' | 'year' | 'notes' | 'pageCount' | 'readPage' | 'translatedReadPage' | 'readProgress' | 'maxReadPage' | 'readingStatus' | 'tags' | 'excerpts' | 'highlights' | 'lastReadAt' | 'doi' | 'publishedDate' | 'casPartition' | 'jcrQuartile' | 'honors' | 'authorRole' | 'coFirstAuthor' | 'correspondingAuthor' | 'partitionYear' | 'matchReason' | 'arxivFavorite' | 'arxivIgnored' | 'linkedSubmissionId' | 'originalName' | 'sourcePath' | 'sha256'>>
 export interface LibrarySnapshot {
+  journalRanks?: import('./journal-ranks').JournalRanksSnapshot
   translationProgress: TranslationProgress | null
+  activeTranslationProgress: TranslationProgress[]
+  paperDaily: import('./paper-daily').PaperDailySnapshot
+  journalFolderLabels: Record<string, string>
   metadataOnline: boolean
   metadataAutomatic: boolean
   arxiv: ArxivSnapshot
@@ -393,6 +461,10 @@ export interface Submission extends Omit<SubmissionInput, 'stages'> {
   sourceSubmissionId: string | null
   reviewItems: RevisionItem[]
 }
+export type SubmissionProgressPatch = Partial<Pick<SubmissionInput,
+  'title' | 'journal' | 'manuscriptId' | 'stages' | 'revisionDueDate' |
+  'reminderEnabled' | 'reminderDays' | 'notes' | 'revisionCompleted' | 'ended'
+>>
 export interface RevisionItem {
   id: string
   reviewer: string

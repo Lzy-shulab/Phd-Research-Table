@@ -56,7 +56,7 @@ export function TimeInput({
     <button type="button" className="time-input-trigger" aria-label={`选择${label}`} disabled={disabled} onClick={showPicker}>
       <Clock3 size={14} />
     </button>
-    <Dialog open={open} onOpenChange={setOpen} title={`选择${label}`} description="上下滑动小时和分钟，也可返回输入框直接填写任意分钟。" className="time-picker-dialog">
+    <Dialog open={open} onOpenChange={setOpen} title={`选择${label}`} className="time-picker-dialog">
       <div className="time-wheel" role="group" aria-label={`${label}滑动选择器`}>
         <label><span>小时</span><select size={7} aria-label={`${label}小时`} value={hour} onChange={(event) => setHour(event.target.value)}>
           {hours.map((item) => <option key={item} value={item}>{item}</option>)}
