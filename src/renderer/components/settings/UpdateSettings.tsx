@@ -48,7 +48,7 @@ export function UpdateSettings() {
           ? '正在更新…'
           : '检查并下载更新'
   const Icon = snapshot?.state === 'ready' ? CheckCircle2 : snapshot?.state === 'downloading' ? Download : RefreshCw
-  return <section className="update-settings settings-action-card" aria-labelledby="update-heading">
+  return <section id="update-settings" className="update-settings settings-action-card" aria-labelledby="update-heading">
     <SettingsHeading icon={ShieldCheck} title="软件更新" id="update-heading">
         {(error || snapshot?.message) && <p className={error ? 'field-error update-message' : 'update-message'} role={error ? 'alert' : 'status'}>{error || snapshot?.message}</p>}
     </SettingsHeading>

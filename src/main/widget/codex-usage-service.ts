@@ -1,21 +1,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
-import { existsSync, readdirSync, statSync } from 'node:fs'
-import { join } from 'node:path'
 import { createInterface } from 'node:readline'
 import { emptyCodexUsage, parseCodexUsage, type CodexUsageSnapshot } from '../../shared/codex-usage'
-
-function codexExecutable() {
-  const override = process.env.WORKBENCH_CODEX_PATH ?? process.env.CODEX_USAGE_NOTCH_CODEX_PATH
-  if (override) return override
-  const directory = join(process.env.LOCALAPPDATA ?? '', 'OpenAI', 'Codex', 'bin')
-  if (process.platform === 'win32' && existsSync(directory)) {
-    const candidates = [join(directory, 'codex.exe'), ...readdirSync(directory, { withFileTypes: true })
-      .filter(entry => entry.isDirectory()).map(entry => join(directory, entry.name, 'codex.exe'))]
-      .filter(path => existsSync(path)).sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)
-    if (candidates[0]) return candidates[0]
-  }
-  return process.platform === 'win32' ? 'codex.exe' : 'codex'
-}
+import { codexTranslationExecutable } from '../library/codex-translator'
 
 export class CodexUsageService {
   private state: CodexUsageSnapshot = { ...emptyCodexUsage }
@@ -29,7 +15,7 @@ export class CodexUsageService {
   private active = true
 
   constructor(private readonly changed: (snapshot: CodexUsageSnapshot) => void,
-    private readonly launch = () => spawn(codexExecutable(), ['app-server'], { windowsHide: true, stdio: 'pipe' })) {}
+    private readonly launch = () => spawn(codexTranslationExecutable(), ['app-server'], { windowsHide: true, stdio: 'pipe' })) {}
 
   snapshot() { return this.state }
   setActive(active: boolean) {
@@ -60,7 +46,7 @@ export class CodexUsageService {
     } catch (error) {
       this.disconnect()
       const message = error instanceof Error ? error.message : ''
-      const reason = /ENOENT/.test(message) ? '未找到 Codex，请先安装并登录 Codex 桌面客户端。'
+      const reason = /ENOENT/.test(message) ? '未找到 Codex CLI，请在工作台设置中安装后登录。'
         : /auth|login|sign.?in|401|403/i.test(message) ? '请先在 Codex 客户端登录，再刷新额度。'
         : message.startsWith('暂无 ChatGPT') ? message : '暂时无法读取 Codex 额度，请稍后刷新。'
       if (!this.stopped) this.state = { ...this.state, error: reason }

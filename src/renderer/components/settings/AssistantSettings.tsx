@@ -1,10 +1,11 @@
 import { SettingsHeading } from './SettingsHeading'
 import { useEffect, useState } from 'react'
-import { Bot, Check, CheckCircle2, CircleAlert, FileText, Languages, PlugZap, Sparkles } from 'lucide-react'
+import { Bot, Check, CheckCircle2, CircleAlert, Download, FileText, Languages, PlugZap, RefreshCw, Sparkles, SquareTerminal } from 'lucide-react'
 import { assistantProviderLabels, assistantProviders, type AssistantProvider, type AssistantSettingsInput } from '../../../shared/assistant'
 import { assistantConfigured, useAssistant } from '../../stores/assistant'
 import { Button } from '../ui/button'
 import type { TranslationHealth } from '../../../shared/types'
+import type { CodexTranslationStatus } from '../../../shared/translation'
 
 export function AssistantSettings() {
   const settings = useAssistant((state) => state.settings)
@@ -12,7 +13,16 @@ export function AssistantSettings() {
   const [drafts, setDrafts] = useState<Partial<Record<AssistantProvider, AssistantSettingsInput>>>({})
   const [busy, setBusy] = useState(false), [message, setMessage] = useState(''), [error, setError] = useState('')
   const [translation, setTranslation] = useState<TranslationHealth | null>(null)
-  useEffect(() => { void Promise.all([useAssistant.getState().load().then(() => setProvider(useAssistant.getState().settings?.activeProvider ?? 'siliconflow')), window.workbench.translationHealth().then((result) => { if (result.ok) setTranslation(result.data) })]) }, [])
+  const [codex, setCodex] = useState<CodexTranslationStatus | null>(null), [codexBusy, setCodexBusy] = useState(false), [codexError, setCodexError] = useState('')
+  const readCodex = async () => {
+    const result = await window.workbench.codexTranslationStatus()
+    if (result.ok) { setCodex(result.data); setCodexError('') } else setCodexError(result.error.message)
+  }
+  useEffect(() => { void Promise.all([
+    useAssistant.getState().load().then(() => setProvider(useAssistant.getState().settings?.activeProvider ?? 'siliconflow')),
+    window.workbench.translationHealth().then((result) => { if (result.ok) setTranslation(result.data) }),
+    readCodex()
+  ]) }, [])
   const saved = settings?.profiles.find((item) => item.provider === provider)
   const draft = drafts[provider] ?? { provider, model: saved?.model ?? '', baseUrl: saved?.baseUrl ?? '', apiKey: '', clearApiKey: false }
   const patch = (input: Partial<AssistantSettingsInput>) => { setDrafts((current) => ({ ...current, [provider]: { ...draft, ...input } })); setMessage(''); setError('') }
@@ -44,6 +54,22 @@ export function AssistantSettings() {
       <article className={assistantConfigured(settings) ? 'is-ready' : ''}><Sparkles size={18} /><span><strong>计划助手</strong><small>{assistantConfigured(settings) ? `${assistantProviderLabels[settings!.activeProvider]} · 模型与密钥已配置` : '待配置'}</small></span>{assistantConfigured(settings) ? <CheckCircle2 size={17} /> : <CircleAlert size={17} />}</article>
       <article className={assistantConfigured(settings) ? 'is-ready' : ''}><FileText size={18} /><span><strong>摘要翻译</strong><small>{assistantConfigured(settings) ? '使用计划助手模型' : '需要先配置计划助手服务'}</small></span>{assistantConfigured(settings) ? <CheckCircle2 size={17} /> : <CircleAlert size={17} />}</article>
       <article className={translation?.installed && translation.configured ? 'is-ready' : ''}><Languages size={18} /><span><strong>全文翻译</strong><small>{translation?.message ?? '正在检查 PDF2zh 引擎与翻译模型'}</small></span>{translation?.installed && translation.configured ? <CheckCircle2 size={17} /> : <CircleAlert size={17} />}</article>
+    </div>
+    <div className={`codex-cli-card${codex?.installed ? ' is-ready' : ''}`}>
+      <span className="codex-cli-icon"><SquareTerminal size={21} /></span>
+      <div><h3>Codex CLI</h3><p>{codexError || codex?.message || '正在检查本机安装状态…'}</p></div>
+      <Button disabled={codexBusy || codex === null} onClick={async () => {
+        setCodexBusy(true); setCodexError('')
+        try {
+          if (codex?.installed) await readCodex()
+          else {
+            const result = await window.workbench.installCodexCli()
+            if (!result.ok) throw new Error(result.error.message)
+            setCodex(result.data)
+          }
+        } catch (failure) { setCodexError(failure instanceof Error ? failure.message : 'Codex CLI 安装未完成。') }
+        finally { setCodexBusy(false) }
+      }}>{codexBusy ? <RefreshCw size={15} className="spin-when-busy" /> : codex?.installed ? <RefreshCw size={15} /> : <Download size={15} />}{codexBusy ? '处理中…' : codex?.installed ? '重新检查' : '一键安装'}</Button>
     </div>
     
     {settings?.activeProvider === 'siliconflow' && assistantConfigured(settings) && <Button onClick={async () => { setBusy(true); const result = await window.workbench.reuseAssistantForTranslation(); if (result.ok) { const health = await window.workbench.translationHealth(); if (health.ok) setTranslation(health.data); setMessage('已将当前 SiliconFlow 服务复制到全文翻译配置；后续仍可分别修改模型。') } else setError(result.error.message); setBusy(false) }}><Languages size={15} />复用当前服务到全文翻译</Button>}

@@ -52,6 +52,12 @@ try {
   await publish(dual)
   await panel.getByRole('progressbar', { name: '5 小时剩余额度' }).waitFor()
   await rail.getByText('5h 8% / 周 76%', { exact: true }).waitFor()
+  const dial = await rail.evaluate(() => ({
+    fiveHour: document.querySelector('#codex-five-hour-orbit').style.strokeDashoffset,
+    weekly: document.querySelector('#codex-week-orbit').style.strokeDashoffset,
+    needle: document.querySelector('#codex-dial-needle').style.transform
+  }))
+  assert.deepEqual(dial, { fiveHour: '92', weekly: '24', needle: 'rotate(-100.8deg)' })
   await panel.waitForTimeout(600)
   await panel.screenshot({ path: join(output, 'dual-window.png'), scale: 'css' })
   await rail.screenshot({ path: join(output, 'rail.png'), scale: 'css' })
@@ -60,7 +66,7 @@ try {
   assert.ok(Math.abs(full.panelWidth - full.width) < 1 && Math.abs(full.panelHeight - full.height) < 1)
   const railFits = await rail.evaluate(() => [...document.querySelectorAll('nav button')].every(button => button.getBoundingClientRect().bottom <= innerHeight))
   assert.equal(railFits, true)
-  pass('dual windows and all seven rail entries fit without clipping')
+  pass('five-hour and weekly quota animate directly on the compact note; all rail entries fit without clipping')
   await app.evaluate(({ BrowserWindow }) => { const window = BrowserWindow.getAllWindows().find(window => window.webContents.getURL().includes('rail.html')); window.setSize(176, 480) })
   await rail.getByRole('button', { name: '打开 PhD 工作台', exact: true }).scrollIntoViewIfNeeded()
   assert.equal(await rail.evaluate(() => document.querySelector('#workbench').getBoundingClientRect().bottom <= innerHeight), true)

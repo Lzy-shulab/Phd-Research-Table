@@ -20,6 +20,7 @@ export function WidgetApp() {
   const [sheet, setSheet] = useState<Sheet>(null)
   const [parent, setParent] = useState<Sheet>(null)
   const [date, setDate] = useState<string>(), [month, setMonth] = useState(() => localDay().slice(0,7))
+  const [weekDate, setWeekDate] = useState(() => localDay())
   const [checkinEntry, setCheckinEntry] = useState<CheckinEntry>()
   const scroll = useRef({ week: 0, month: 0 })
   const focusInput = useRef<HTMLInputElement>(null)
@@ -71,8 +72,14 @@ export function WidgetApp() {
   const active = report?.checkins.find(isOpenCheckin)
   const showDay = (day?: string, entry?: CheckinEntry) => { setDate(day); setCheckinEntry(entry); setParent(sheet); setSheet('checkin') }
   const close = () => { setSheet(null); setParent(null) }
-  const title = sheet === 'week' ? '本周打卡' : sheet === 'month' ? '本月打卡' : sheet === 'checkin' ? '研究打卡' : sheet === 'city' ? '天气城市' : sheet === 'settings' ? '面板设置' : sheet === 'trip' ? '增加出差' : '增加休假'
-  const selected = useMemo(() => report && stats ? sheet === 'month' ? widgetStatistics(report, new Date(month + '-15T12:00:00')).month : stats.week : null, [report, stats, sheet, month])
+  const title = sheet === 'week' ? weekDate === today ? '本周打卡' : '周打卡' : sheet === 'month' ? '本月打卡' : sheet === 'checkin' ? '研究打卡' : sheet === 'city' ? '天气城市' : sheet === 'settings' ? '面板设置' : sheet === 'trip' ? '增加出差' : '增加休假'
+  const selected = useMemo(() => report && stats ? sheet === 'month' ? widgetStatistics(report, new Date(month + '-15T12:00:00')).month : widgetStatistics(report, new Date(weekDate + 'T12:00:00')).week : null, [report, stats, sheet, month, weekDate])
+  const changeWeek = (days: number) => {
+    const next = new Date(weekDate + 'T12:00:00')
+    next.setDate(next.getDate() + days)
+    scroll.current.week = 0
+    setWeekDate(localDay(next))
+  }
   return <>
     <PanelFrame title="打卡记录" covered={Boolean(sheet)} busy={periodEditing || started !== null || ['checkin','trip','leave','city'].includes(sheet ?? '')} footer={<PanelFooter updatedAt={updatedAt} status={started !== null ? '专注中' : undefined} refreshLabel="刷新打卡" onRefresh={started === null ? () => { void reload().catch(fail) } : undefined} actions={started !== null ? <button aria-label="结束心流" onClick={() => setStarted(null)}><Square size={24}/><span>结束心流</span></button> : <button aria-label="心流模式" disabled={periodEditing} onClick={() => { setStarted(Date.now()); setNow(Date.now()) }}><Scan size={24}/><span>进入心流</span></button>}/> }>
       <div className="desktop-checkin" data-testid="desktop-widget" data-mode={started ? 'focus' : 'normal'} inert={Boolean(sheet)} aria-hidden={Boolean(sheet)}>
@@ -114,7 +121,7 @@ export function WidgetApp() {
       </div>
     </PanelFrame>
     {sheet && <WidgetSheet key={sheet} page={sheet} title={title} close={close} back={() => { setSheet(parent); setParent(null) }} backLabel={parent ? '返回打卡记录' : '返回桌面面板'}>
-      {(sheet === 'week' || sheet === 'month') && report && stats && selected && <AttendancePanel key={sheet} snapshot={report} period={sheet} statistics={selected} today={stats.today.date} month={month} changeMonth={setMonth} scrollTop={scroll.current[sheet]} onScroll={value => { scroll.current[sheet] = value }} changePeriod={setSheet} editDay={showDay}/>}
+      {(sheet === 'week' || sheet === 'month') && report && stats && selected && <AttendancePanel key={sheet} snapshot={report} period={sheet} statistics={selected} today={stats.today.date} month={month} changeMonth={setMonth} scrollTop={scroll.current[sheet]} onScroll={value => { scroll.current[sheet] = value }} changePeriod={period => { if (period === 'week') setWeekDate(today); setSheet(period) }} changeWeek={changeWeek} currentWeek={selected.range.start === stats.week.range.start} editDay={showDay}/>} 
       {sheet === 'checkin' && report && <CheckinPanel snapshot={report} reload={reload} initialDate={date} initialEntry={checkinEntry}/>}
       {(sheet === 'trip' || sheet === 'leave') && report && <AbsencePanel kind={sheet} snapshot={report} reload={reload}/>}
       {sheet === 'city' && <CityPanel selectedCityId={snapshot?.preferences.city?.id} choose={async city => { await update({ city }); close(); void window.workbench.widgetWeather().then(unwrap).then(setWeather).catch(fail) }}/>}

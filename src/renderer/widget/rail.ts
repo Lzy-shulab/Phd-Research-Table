@@ -50,7 +50,19 @@ const submissions = document.querySelector<HTMLButtonElement>('[data-panel=submi
 const reading = document.querySelector<HTMLButtonElement>('[data-panel=reading]')!
 const gpu = document.querySelector<HTMLButtonElement>('[data-panel=gpu]')!
 const codex = document.querySelector<HTMLButtonElement>('[data-panel=codex]')!
+const renderQuotaOrbit = (id: string, remaining: number | null | undefined) => {
+  document.querySelector<SVGCircleElement>('#' + id)!.style.strokeDashoffset = String(100 - Math.max(0, Math.min(100, remaining ?? 0)))
+}
 const renderCodex = (state: CodexUsageSnapshot) => {
+  const fiveHour = state.windows.find(item => item.durationMinutes === 300)
+  const weekly = state.windows.find(item => item.durationMinutes === 10080)
+  renderQuotaOrbit('codex-five-hour-orbit', fiveHour?.remainingPercent)
+  renderQuotaOrbit('codex-week-orbit', weekly?.remainingPercent)
+  codex.classList.toggle('has-five-hour', Boolean(fiveHour))
+  codex.classList.toggle('has-weekly', Boolean(weekly))
+  const remaining = state.windows.map(item => item.remainingPercent).filter((value): value is number => value !== null)
+  const limiting = remaining.length ? Math.min(...remaining) : 0
+  document.querySelector<SVGPathElement>('#codex-dial-needle')!.style.transform = `rotate(${-120 + limiting * 2.4}deg)`
   document.querySelector('#codex-status')!.textContent = codexRailSummary(state)
   codex.classList.toggle('is-urgent', !state.error && state.windows.some(item => item.remainingPercent !== null && item.remainingPercent <= 10))
   codex.title = state.error ?? state.windows.map(item => `${item.label}剩余 ${item.remainingPercent === null ? '未知' : item.remainingPercent + '%'}`).join('；')

@@ -1,5 +1,6 @@
 import { motion } from 'motion/react'
-import { Bot, Database, FolderCog, Monitor, Moon, Palette, Sun, ChartColumn, CircleGauge, Clock3, Wallet, MessageSquare } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Bot, Database, FolderCog, Languages, Monitor, Moon, Palette, PanelsTopLeft, RefreshCw, Sun, ChartColumn, CircleGauge, Clock3, Wallet, MessageSquare } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import { appearanceLabels } from '../../../shared/labels'
 import { modules, plannerViews } from '../../app/modules'
@@ -18,6 +19,15 @@ import { settleSpring } from '../../lib/motion'
 import { useWorkbenchCodex } from '../../stores/workbench-codex'
 import { useInterface } from '../../stores/interface'
 import { CodexNewChat } from '../codex/CodexNewChat'
+
+const settingsLinks = [
+  { id: 'appearance-settings', label: '外观与显示', icon: Palette },
+  { id: 'desktop-widget-settings', label: '桌面便签', icon: PanelsTopLeft },
+  { id: 'assistant-settings', label: 'AI 与 Codex', icon: Bot },
+  { id: 'translation-settings-entry', label: '全文翻译', icon: Languages },
+  { id: 'storage-settings', label: '文件与数据', icon: FolderCog },
+  { id: 'update-settings', label: '软件更新', icon: RefreshCw }
+] as const
 
 function AssistantSidebar() {
   const prompts = useWorkbenchCodex(useShallow(state => state.turns.map(turn => turn.prompt)))
@@ -41,10 +51,22 @@ export function Sidebar() {
   const setAppearance = useWorkbench((s) => s.setAppearance)
   const databasePath = useWorkbench((s) => s.databasePath)
   const collapsed = useInterface(state => state.preferences.sidebarCollapsed)
+  const [settingsAnchor, setSettingsAnchor] = useState<(typeof settingsLinks)[number]['id']>('appearance-settings')
   const tasks = useTasks()
   const now = useClock()
   const active = tasks.filter((t) => t.status !== 'completed')
   const module = modules.find((m) => m.id === section)!
+  useEffect(() => {
+    if (section !== 'settings') return
+    const root = document.querySelector('.settings-workspace')
+    const targets = settingsLinks.map(item => document.getElementById(item.id)).filter((item): item is HTMLElement => Boolean(item))
+    const observer = new IntersectionObserver(entries => {
+      const visible = entries.filter(entry => entry.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0]
+      if (visible?.target.id) setSettingsAnchor(visible.target.id as typeof settingsAnchor)
+    }, { root, rootMargin: '-8% 0px -72% 0px', threshold: [0, .1, 1] })
+    targets.forEach(target => observer.observe(target))
+    return () => observer.disconnect()
+  }, [section])
   return (
     <aside className="sidebar" inert={collapsed}>
       {section !== 'codex' && <div className="sidebar-top">
@@ -102,33 +124,10 @@ export function Sidebar() {
         ) : (
           <>
             <nav aria-label="设置分类">
-              <button
-                className="sidebar-link"
-                onClick={() =>
-                  document.getElementById('appearance-settings')?.scrollIntoView({ block: 'start' })
-                }
-              >
-                <Palette size={17} />
-                <span>外观与显示</span>
-              </button>
-              <button
-                className="sidebar-link"
-                onClick={() =>
-                  document.getElementById('assistant-settings')?.scrollIntoView({ block: 'start' })
-                }
-              >
-                <Bot size={17} />
-                <span>AI 助手</span>
-              </button>
-              <button
-                className="sidebar-link"
-                onClick={() =>
-                  document.getElementById('storage-settings')?.scrollIntoView({ block: 'start' })
-                }
-              >
-                <FolderCog size={17} />
-                <span>文件保存</span>
-              </button>
+              {settingsLinks.map(item => <button key={item.id} className={cn('sidebar-link', settingsAnchor === item.id && 'selected')} aria-current={settingsAnchor === item.id ? 'location' : undefined} onClick={() => {
+                setSettingsAnchor(item.id)
+                document.getElementById(item.id)?.scrollIntoView({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' })
+              }}><item.icon size={17} /><span>{item.label}</span></button>)}
             </nav>
             
           </>

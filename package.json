@@ -1,7 +1,7 @@
 {
   "name": "phd-research-workbench",
   "productName": "PhD 科研工作台",
-  "version": "0.8.61",
+  "version": "0.8.62",
   "description": "A local-first desktop workspace for deliberate research planning.",
   "author": "PhD 科研工作台",
   "private": true,
@@ -103,6 +103,13 @@
           "package.json",
           "LICENSE",
           "prebuilds/win32-x64.node"
+        ]
+      },
+      {
+        "from": "node_modules/drizzle-orm",
+        "to": "node_modules/drizzle-orm",
+        "filter": [
+          "**/*"
         ]
       }
     ],

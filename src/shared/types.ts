@@ -235,6 +235,7 @@ export interface WorkbenchApi {
   exportPaper: (id: string, variant: PaperVariant) => Promise<Result<boolean>>
   translationHealth: () => Promise<Result<TranslationHealth>>
   codexTranslationStatus: () => Promise<Result<import('./translation').CodexTranslationStatus>>
+  installCodexCli: () => Promise<Result<import('./translation').CodexTranslationStatus>>
   openJournalRankConsole: () => Promise<Result<void>>
   saveJournalRankSettings: (input: { secretKey?: string; enabled: boolean; clearKey?: boolean }) => Promise<Result<import('./journal-ranks').JournalRanksSnapshot>>
   refreshJournalRanks: (journals: string[], force?: boolean) => Promise<Result<import('./journal-ranks').JournalRanksSnapshot>>

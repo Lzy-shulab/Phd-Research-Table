@@ -168,6 +168,7 @@ const api: WorkbenchApi = {
   exportPaper: (id, variant) => ipcRenderer.invoke('library:export', id, variant),
   translationHealth: () => ipcRenderer.invoke('library:health'),
   codexTranslationStatus: () => ipcRenderer.invoke('library:codex-status'),
+  installCodexCli: () => ipcRenderer.invoke('codex-cli:install'),
   openJournalRankConsole: () => ipcRenderer.invoke('library:journal-console'),
   saveJournalRankSettings: (input) => ipcRenderer.invoke('library:journal-settings', input),
   refreshJournalRanks: (journals, force) => ipcRenderer.invoke('library:journal-refresh', journals, force),

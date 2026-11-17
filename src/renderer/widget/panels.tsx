@@ -47,10 +47,10 @@ export function WidgetSheet({ page, title, close, back, backLabel, children }: {
   </section>
 }
 
-export function AttendancePanel({ snapshot, period, statistics, today, month, changeMonth, scrollTop, onScroll, changePeriod, editDay }: {
+export function AttendancePanel({ snapshot, period, statistics, today, month, changeMonth, scrollTop, onScroll, changePeriod, changeWeek, currentWeek, editDay }: {
   snapshot: ReportSnapshot; period: 'week' | 'month'; statistics: ReturnType<typeof widgetStatistics>['week']; today: string
   scrollTop: number; onScroll: (value: number) => void; changePeriod: (period: 'week' | 'month') => void; editDay: (date: string) => void
-  month: string; changeMonth: (month: string) => void
+  month: string; changeMonth: (month: string) => void; changeWeek: (days: number) => void; currentWeek: boolean
 }) {
   const { start, end } = statistics.range
   const rows = useMemo(() => widgetAttendanceDays(snapshot, { start, end }, today), [snapshot, start, end, today])
@@ -64,9 +64,9 @@ export function AttendancePanel({ snapshot, period, statistics, today, month, ch
     </div>
     <div className="widget-attendance-summary">{period === 'month' ? <label className="widget-month-picker"><span>{Number(month.slice(0, 4))}年{Number(month.slice(5))}月</span><ChevronDown size={21} aria-hidden="true" />
       <input type="month" aria-label="选择打卡月份" value={month} onClick={event => event.currentTarget.showPicker()} onChange={event => { if (/^\d{4}-\d{2}$/.test(event.target.value)) changeMonth(event.target.value) }} /></label>
-      : <span>{shortDate(statistics.range.start)} — {shortDate(statistics.range.end)}</span>}
+      : <div className="widget-week-picker"><button aria-label="查看上一周" onClick={() => changeWeek(-7)}><ArrowLeft size={19} /></button><span>{shortDate(statistics.range.start)} — {shortDate(statistics.range.end)}</span><button aria-label="查看下一周" disabled={currentWeek} onClick={() => changeWeek(7)}><ChevronRight size={19} /></button></div>}
       <strong><AttendanceDuration minutes={statistics.minutes} /><small>累计时长</small></strong></div>
-    <div className="widget-attendance-table" role="table" aria-label={`${period === 'week' ? '本周' : '本月'}每日打卡`}>
+    <div className="widget-attendance-table" role="table" aria-label={`${period === 'week' ? currentWeek ? '本周' : '所选周' : '本月'}每日打卡`}>
       <div className="widget-attendance-columns" role="row"><span role="columnheader">日期</span><span role="columnheader">开始 — 结束</span><span role="columnheader">时长</span></div>
       <div ref={list} className="widget-attendance-list" tabIndex={0} aria-label="滚动查看每天打卡" onScroll={event => onScroll(event.currentTarget.scrollTop)}>
         {rows.map(row => <div className={`widget-attendance-row ${row.isToday ? 'is-today' : ''}`} role="row" key={row.date} data-date={row.date}>

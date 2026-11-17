@@ -36,6 +36,16 @@ nav { display:grid; gap:8px; padding:8px 0 8px 4px; max-height:100vh; overflow-y
 :root[data-panel-open=true] .rail-copy,
 .rail-slot:has(:is(.rail-water,.rail-notice):not([hidden])) .rail-copy { opacity:0; transition:opacity .12s ease-out; }
 #codex-status { display:block; overflow:hidden; text-overflow:ellipsis; font-size:12px; line-height:20px; }
+.codex-quota-dial { width:40px; height:40px; overflow:visible; }
+.codex-quota-dial circle { fill:none; }
+.codex-quota-track { stroke:var(--edge); stroke-width:2.8; }
+.codex-quota-value { transform:rotate(-90deg); transform-origin:24px 24px; stroke-linecap:round; stroke-width:3; transition:stroke-dashoffset .7s cubic-bezier(.22,1,.36,1),opacity .2s ease-out; }
+.codex-week-value { stroke:var(--accent); opacity:.2; }
+.codex-five-hour-value { stroke:var(--positive); opacity:.2; }
+.has-weekly .codex-week-value,.has-five-hour .codex-five-hour-value { opacity:1; }
+#codex-dial-needle { fill:none; stroke:var(--ink); stroke-width:1.8; stroke-linecap:round; transform-origin:24px 24px; transition:transform .7s cubic-bezier(.22,1,.36,1); }
+.codex-dial-pin { fill:var(--ink) !important; }
+.is-urgent .codex-quota-value { stroke:var(--caution); }
 .dual-orbit { width:40px; height:40px; fill:none; stroke-width:3; transform:rotate(-90deg); }
 .dual-orbit circle { stroke-linecap:round; transition:stroke-dashoffset .5s cubic-bezier(.22,1,.36,1); }
 .orbit-track { stroke:var(--edge); }
@@ -108,7 +118,7 @@ nav { display:grid; gap:8px; padding:8px 0 8px 4px; max-height:100vh; overflow-y
 .rail-alert:empty { display:none; }
 @keyframes reading-pulse { from { opacity:.4; } to { opacity:1; } }
 @media (prefers-reduced-motion: reduce) {
-  .rail-note,.rail-note::before,.rail-symbol,.rail-copy,.rail-progress #reading-progress,.dual-orbit circle,.rail-launch-symbol svg { transition:none !important; }
+  .rail-note,.rail-note::before,.rail-symbol,.rail-copy,.rail-progress #reading-progress,.dual-orbit circle,.codex-quota-value,#codex-dial-needle,.rail-launch-symbol svg { transition:none !important; }
   .rail-note:active .rail-symbol { scale:none; }
   #workbench:hover .rail-launch-symbol svg { transform:none; }
   .is-unknown .rail-reading-icon,.rail-note.is-opening .rail-symbol { animation:none; }

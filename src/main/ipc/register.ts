@@ -53,6 +53,7 @@ import { recognizeDesktopTask } from '../widget/task-capture'
 import type { DesktopNotice } from '../../shared/widget'
 import type { DesktopPanel } from '../../shared/widget'
 import { codexInputSchema, WorkbenchCodex } from '../assistant/workbench-codex'
+import { installCodexCli } from '../assistant/codex-installer'
 
 export function registerIpc(
   getConnection: () => DatabaseConnection,
@@ -361,6 +362,7 @@ export function registerIpc(
   }).partial().strict()
   handle('library:snapshot', () => library().snapshot())
   handle('library:codex-status', () => codexTranslationStatus())
+  handle('codex-cli:install', () => installCodexCli())
   handle('library:journal-console', () => shell.openExternal('https://www.easyscholar.cc/console/query'))
   handle('library:journal-settings', input => library().journalRanks.save(z.object({ secretKey: z.string().max(10000).optional(), enabled: z.boolean(), clearKey: z.boolean().optional() }).strict().parse(input)))
   handle('library:journal-refresh', (journals, force) => library().journalRanks.refresh(z.array(z.string().max(500)).max(500).parse(journals), z.boolean().optional().parse(force)))

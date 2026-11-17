@@ -46,7 +46,9 @@ def api(path, method='GET', body=None):
         args += ['--retry', '2']
     args += ['--header', 'Content-Type: application/json', url]
     if body is not None:
-        args += ['--data-binary', json.dumps(body, ensure_ascii=False)]
+        body_path = evidence / 'github-request-body.json'
+        body_path.write_text(json.dumps(body, ensure_ascii=False), encoding='utf-8')
+        args += ['--data-binary', f'@{body_path}']
     response = run_curl(args)
     if response.returncode:
         raise RuntimeError(f'GitHub API request failed: {response.stderr.strip()}')
@@ -60,7 +62,7 @@ def inspect():
 def sync():
     if not (checkout / '.git').exists():
         raise RuntimeError('Create a clean source checkout before publishing')
-    excluded = {'node_modules', 'out', 'release', 'test-results', 'delete', '工作台数据', '.git'}
+    excluded = {'node_modules', 'out', 'release', 'test-results', 'delete', 'tmp', '工作台数据', '.git'}
     files = []
     for root, directories, names in os.walk(workspace):
         directories[:] = [name for name in directories if name not in excluded and not name.startswith('release-stage-')]
@@ -84,18 +86,61 @@ def sync():
             archived.parent.mkdir(parents=True, exist_ok=True)
             shutil.move(str(checkout / name), archived)
     with (evidence / 'git.log').open('a', encoding='utf-8') as log:
-        for args in [['git', 'add', '-A'], ['git', 'commit', '-m', f'Fix attendance deductions, settings alignment and in-app updates for v{version}'],
+        for args in [['git', 'add', '-A'], ['git', 'commit', '-m', f'Add customizable widgets, Codex quota views and settings refresh for v{version}'],
                      ['git', '-c', 'http.proxy=', '-c', 'https.proxy=', 'push', 'origin', 'main']]:
             subprocess.run(args, cwd=checkout, stdout=log, stderr=log, check=True)
     print(f'SOURCE_PUSHED files={len(files)} version={version}')
 
+def sync_api():
+    if not (checkout / '.git').exists():
+        raise RuntimeError('Create a clean source checkout before publishing')
+    head = api('git/ref/heads/main')['object']['sha']
+    local_base = subprocess.run(['git', 'rev-parse', 'origin/main'], cwd=checkout, text=True, capture_output=True, check=True).stdout.strip()
+    if head != local_base:
+        raise RuntimeError('Remote main changed after the release checkout was prepared')
+    base_tree = api(f'git/commits/{head}')['tree']['sha']
+    changes = subprocess.run(['git', 'diff', '--name-status', 'origin/main..main'], cwd=checkout, text=True, capture_output=True, check=True).stdout.splitlines()
+    elements = []
+    import base64
+    for line in changes:
+        status, path = line.split('\t', 1)
+        if status == 'D':
+            elements.append({'path': path, 'mode': '100644', 'type': 'blob', 'sha': None})
+            continue
+        if status not in {'A', 'M'}:
+            raise RuntimeError(f'Unsupported source change: {status} {path}')
+        source = checkout / path
+        mode_line = subprocess.run(['git', 'ls-files', '-s', '--', path], cwd=checkout, text=True, capture_output=True, check=True).stdout
+        mode = mode_line.split(' ', 1)[0] or '100644'
+        blob = api('git/blobs', 'POST', {'content': base64.b64encode(source.read_bytes()).decode('ascii'), 'encoding': 'base64'})
+        elements.append({'path': path, 'mode': mode, 'type': 'blob', 'sha': blob['sha']})
+    tree = api('git/trees', 'POST', {'base_tree': base_tree, 'tree': elements})
+    commit = api('git/commits', 'POST', {'message': f'Add customizable widgets, Codex quota views and settings refresh for v{version}', 'tree': tree['sha'], 'parents': [head]})
+    api('git/refs/heads/main', 'PATCH', {'sha': commit['sha'], 'force': False})
+    remote_package = api('contents/package.json?ref=main')
+    assert json.loads(base64.b64decode(remote_package['content']))['version'] == version
+    print(f'SOURCE_PUSHED_VIA_API files={len(elements)} version={version}')
+
 def publish():
     notes = f'''PhD 科研工作台 v{version}
 
-- 出差与休假按每天 12 小时从周、月打卡目标中扣除，周末和节假日同样计算；日历显示日期标记。
-- 统一设置页图标、标题和操作按钮的对齐，改善大字体和窄窗口布局。
-- 支持应用内下载更新包，重启后自动替换程序文件并重新打开工作台。
-- 精修工作区图标，改善页面切换、Dock、任务详情和弹层动效。'''
+本版本集中完善桌面便签、Codex 使用状态与设置体验。
+
+## 功能新增
+
+- 桌面便签支持逐项显示、隐藏与排序，只保留当前用户需要的入口。
+- Codex 额度便签以动态双环展示 5 小时与周额度，并持续刷新当前状态。
+- 打卡周明细支持查看上一周和下一周。
+- 设置页支持检测并一键安装 Codex CLI。
+
+## 改进
+
+- 重构设置页导航、内容宽度与信息分组，统一外观、桌面便签、AI 与 Codex、全文翻译、文件与数据和软件更新六类入口。
+- 优化文件保存位置、工作台数据与文献信息设置的布局，改善窄窗口、大字号和深浅模式下的可读性。
+
+## 修复
+
+- 修复 v0.8.61 正式包缺少数据库运行时依赖而无法启动的问题。'''
     release = next((item for item in api('releases?per_page=30') if item['tag_name'] == f'v{version}'), None)
     if release is None:
         release = api('releases', 'POST', {'tag_name': f'v{version}', 'target_commitish': 'main', 'name': f'PhD 科研工作台 v{version}', 'body': notes, 'draft': True, 'prerelease': False})
@@ -132,5 +177,5 @@ def publish():
     print(json.dumps(result, ensure_ascii=False))
 
 parser = argparse.ArgumentParser()
-parser.add_argument('operation', choices=['inspect', 'sync', 'publish'])
+parser.add_argument('operation', choices=['inspect', 'sync', 'sync_api', 'publish'])
 globals()[parser.parse_args().operation]()

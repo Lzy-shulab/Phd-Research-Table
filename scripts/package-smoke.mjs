@@ -8,10 +8,16 @@ mkdirSync(directory, { recursive: true })
 const env = { ...process.env, WORKBENCH_DISABLE_ARXIV_AUTO: '1', WORKBENCH_DATA_DIR: resolve(directory, 'isolated-data') }
 delete env.ELECTRON_RUN_AS_NODE
 const executablePath = resolve(process.env.WORKBENCH_TEST_EXECUTABLE || 'release/win-unpacked/PhD 科研工作台.exe')
-const app = await electron.launch({ executablePath, args: [], env })
+const app = await electron.launch({ executablePath, args: ['--workbench'], env })
 try {
-  const page = await app.firstWindow()
-  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].hide())
+  await app.firstWindow()
+  let page
+  for (let index = 0; index < 100 && !page; index++) {
+    page = app.windows().find(window => window.url().includes('index.html'))
+    if (!page) await new Promise(resolve => setTimeout(resolve, 100))
+  }
+  assert.ok(page, 'Packaged workbench window opened')
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(window => window.webContents.getURL().includes('index.html'))?.hide())
   const errors = []
   page.on('pageerror', error => errors.push(error.message))
   await page.getByRole('heading', { name: '今日计划', exact: true }).waitFor()
@@ -20,13 +26,13 @@ try {
   const runtime = await app.evaluate(({ app, BrowserWindow, screen }) => ({
     packaged: app.isPackaged,
     dataPath: app.getPath('userData'),
-    bounds: BrowserWindow.getAllWindows()[0].getBounds(),
+    bounds: BrowserWindow.getAllWindows().find(window => window.webContents.getURL().includes('index.html')).getBounds(),
     scaleFactor: screen.getPrimaryDisplay().scaleFactor
   }))
   assert.equal(runtime.packaged, true)
   assert.equal(runtime.dataPath, env.WORKBENCH_DATA_DIR)
   const controls = await app.evaluate(async ({ BrowserWindow }) => {
-    const window = BrowserWindow.getAllWindows()[0]
+    const window = BrowserWindow.getAllWindows().find(window => window.webContents.getURL().includes('index.html'))
     await new Promise(resolve => { window.once('minimize', resolve); window.minimize() })
     const minimized = window.isMinimized()
     await new Promise(resolve => { window.once('restore', resolve); window.restore() })
@@ -44,14 +50,14 @@ try {
   assert.ok(!csp.includes('ws:'))
   const geometry = []
   for (const [width, height] of [[1100, 700], [1920, 1080], [2560, 1440]]) {
-    await app.evaluate(({ BrowserWindow }, bounds) => BrowserWindow.getAllWindows()[0].setBounds(bounds), { width, height })
+    await app.evaluate(({ BrowserWindow }, bounds) => BrowserWindow.getAllWindows().find(window => window.webContents.getURL().includes('index.html')).setBounds(bounds), { width, height })
     await page.waitForFunction(({ width, height }) => Math.abs(innerWidth - width) <= 4 && Math.abs(innerHeight - height) <= 4, { width, height })
     const measured = await page.evaluate(() => ({ width: innerWidth, height: innerHeight, overflow: document.documentElement.scrollWidth > innerWidth }))
     assert.equal(measured.overflow, false)
     geometry.push(measured)
     await page.screenshot({ path: resolve(directory, `${width}x${height}.png`), animations: 'disabled' })
   }
-  await app.evaluate(({ BrowserWindow }, bounds) => BrowserWindow.getAllWindows()[0].setBounds(bounds), runtime.bounds)
+  await app.evaluate(({ BrowserWindow }, bounds) => BrowserWindow.getAllWindows().find(window => window.webContents.getURL().includes('index.html')).setBounds(bounds), runtime.bounds)
   await page.getByRole('navigation', { name: '科研工作空间' }).getByRole('button', { name: '文献阅读' }).click()
   const imported = await page.evaluate((path) => window.workbench.importPapers([path], null, false), resolve('tests/fixtures/translation-check.pdf'))
   assert.equal(imported.ok, true)

@@ -27,7 +27,7 @@ const unwrap = (result) => { assert.equal(result.ok, true, JSON.stringify(result
 const snapshot = async () => unwrap(await page.evaluate(() => window.workbench.librarySnapshot()))
 const storage = async () => unwrap(await page.evaluate(() => window.workbench.storageSnapshot()))
 const pick = async (path) => app.evaluate(({ dialog }, path) => { dialog.showOpenDialog = async () => ({ canceled: !path, filePaths: path ? [path] : [] }) }, path)
-const settings = async () => { await page.getByRole('navigation', { name: '科研工作空间' }).getByRole('button', { name: '设置', exact: true }).click(); await page.getByRole('heading', { name: '保存位置' }).waitFor() }
+const settings = async () => { await page.getByRole('navigation', { name: '科研工作空间' }).getByRole('button', { name: '设置', exact: true }).click(); await page.getByRole('heading', { name: '文件与数据' }).waitFor() }
 const capture = async (name) => {
   await page.waitForFunction(() => Array.from(document.querySelectorAll('.dock-selection')).every((selection) => {
     const a = selection.getBoundingClientRect(), b = selection.parentElement.getBoundingClientRect()
@@ -43,10 +43,10 @@ try {
   await settings()
   assert.deepEqual(await page.locator('.dock-item').allTextContents(), ['研究计划', '文献阅读', '科研成果', '论文投稿', '设置'])
   const targets = { library: join(dataDirectory, '文献资料', '高光谱成像与多模态遥感研究', '阅读中的论文与长期归档资料'), publication: join(dataDirectory, '成果 PDF'), arxiv: join(dataDirectory, '每日文献') }
-  for (const [kind, label] of [['library', '文献 PDF'], ['publication', '科研成果 PDF'], ['arxiv', 'Arxiv Daily']]) {
+  for (const [kind, label] of [['library', '文献 PDF'], ['publication', '科研成果 PDF'], ['arxiv', 'Arvix 文献']]) {
     mkdirSync(targets[kind], { recursive: true }); await pick(targets[kind])
     await page.getByRole('button', { name: `更改${label}保存位置`, exact: true }).click()
-    await page.getByText(`${label}保存位置已更新，新文件将保存到此处。`, { exact: true }).waitFor()
+    await page.getByText(`${label}保存位置已更新。`, { exact: true }).waitFor()
     assert.equal((await storage()).directories[kind], targets[kind])
   }
   assert.equal((await snapshot()).arxiv.directory, targets.arxiv)
@@ -64,6 +64,10 @@ try {
   await page.waitForFunction(() => !document.querySelector('[data-testid="storage-arxiv"] button').disabled)
   assert.equal(await app.evaluate(() => globalThis.__settingsOpenedPath), targets.arxiv)
   record('Cancelled and invalid selections preserve saved paths; Open sends the configured directory to the OS shell')
+  const gpuVisibility = page.locator('.widget-visibility-grid button').filter({ hasText: 'GPU 监控' })
+  await gpuVisibility.click(); assert.equal((await page.evaluate(() => window.workbench.widgetSnapshot())).data.preferences.hiddenPanels.includes('gpu'), true)
+  await gpuVisibility.click(); assert.equal((await page.evaluate(() => window.workbench.widgetSnapshot())).data.preferences.hiddenPanels.includes('gpu'), false)
+  record('Desktop note visibility is directly customizable from Settings and saves immediately')
   unwrap(await page.evaluate((paths) => window.workbench.importPapers(paths, null, false), [sources[1]]))
   const added = (await snapshot()).papers.find((paper) => paper.id !== oldPaper.id)
   assert.equal(dirname(dirname(added.sourcePath)), targets.library)
