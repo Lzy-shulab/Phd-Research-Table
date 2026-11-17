@@ -56,7 +56,9 @@ jobs:
           WORKBENCH_DISABLE_NOTIFICATIONS: '1'
         shell: pwsh
         run: |
-          $env:WORKBENCH_TEST_EXECUTABLE = Join-Path (Get-Location) 'release/win-unpacked/PhD 科研工作台.exe'
+          $stagedApp = Join-Path $env:RUNNER_TEMP 'phd-research-workbench-runtime-check/win-unpacked'
+          Copy-Item -LiteralPath 'release/win-unpacked' -Destination $stagedApp -Recurse
+          $env:WORKBENCH_TEST_EXECUTABLE = Join-Path $stagedApp 'PhD 科研工作台.exe'
           node scripts/settings-alignment-smoke.mjs
           if ($LASTEXITCODE -ne 0) { throw 'Packaged settings check failed.' }
           node scripts/checkin-absence-smoke.mjs

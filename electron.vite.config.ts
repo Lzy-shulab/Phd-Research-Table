@@ -5,7 +5,13 @@ import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
   main: {
-    build: { rollupOptions: { input: { main: resolve('src/main/main.ts'), 'migrate-workspace': resolve('src/main/migrate-workspace.ts') }, external: ['better-sqlite3'] } }
+    build: {
+      externalizeDeps: { exclude: ['date-fns', 'fast-xml-parser', 'zod'] },
+      rollupOptions: {
+        input: { main: resolve('src/main/main.ts'), 'migrate-workspace': resolve('src/main/migrate-workspace.ts') },
+        external: ['better-sqlite3']
+      }
+    }
   },
   preload: {
     build: {
